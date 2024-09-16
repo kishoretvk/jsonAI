@@ -1,6 +1,6 @@
 from typing import List, Union, Dict, Any
 
-from GenerativeJson.logits_processors import (
+from jsonformer.logits_processors import (
     NumberStoppingCriteria,
     OutputNumbersTokens,
     StringStoppingCriteria,
@@ -12,7 +12,7 @@ import json
 GENERATION_MARKER = "|GENERATION|"
 
 
-class GenerativeJson:
+class Jsonformer:
     value: Dict[str, Any] = {}
 
     def __init__(
