@@ -1,7 +1,7 @@
 [tool.poetry]
-name = "GenerativeJson"
+name = "jsonformer"
 version = "0.12.0"
-description = "pre-release"
+description = ""
 authors = ["1rgs <kishoretvk@hotmail.com>"]
 readme = "README.md"
 
