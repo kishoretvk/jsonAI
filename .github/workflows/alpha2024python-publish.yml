@@ -51,12 +51,20 @@ jobs:
     - name: Create temporary directory and copy files
       run: |
         mkdir temp_build
-        cp -r * temp_build/
+        shopt -s extglob
+        cp -r !(temp_build) temp_build/
+    - name: List directory contents
+      run: |
         cd temp_build
+        ls -la
     - name: Build package
       run: |
         cd temp_build
         poetry build
+    - name: List build artifacts
+      run: |
+        cd temp_build/dist
+        ls -la
     - name: Publish package
       run: |
         cd temp_build
