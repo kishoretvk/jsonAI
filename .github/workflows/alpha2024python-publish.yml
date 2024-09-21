@@ -48,9 +48,16 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install poetry
+    - name: Create temporary directory and copy files
+      run: |
+        mkdir temp_build
+        cp -r * temp_build/
+        cd temp_build
     - name: Build package
-      run: poetry build
+      run: |
+        cd temp_build
+        poetry build
     - name: Publish package
-      run: poetry publish --username __token__ --password ${{ secrets.PYPI_API_TOKEN }}
-
-
+      run: |
+        cd temp_build
+        poetry publish --username __token__ --password ${{ secrets.PYPI_API_TOKEN }}
