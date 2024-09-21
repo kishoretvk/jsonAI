@@ -1,32 +1,71 @@
-[tool.poetry]
-name = "jsonAI"
-version = "0.12.0"
-description = ""
-authors = ["1rgs <kishoretvk9@gmail.com>"]
-readme = "README.md"
+name: Python package
 
-[tool.poetry.dependencies]
-python = "^3.9,<4.0"
-termcolor = "^2.3.0"
-jaxtyping = "^0.2.28"
+on:
+  push:
+    branches: [ "main", "pre-release" ]
+  pull_request:
+    branches: [ "main", "pre-release" ]
+  release:
+    types: [published]
 
-[tool.poetry.group.dev.dependencies]
-pandas = "^2.2.2"
-ipykernel = "^6.22.0"
-torch = "^2.0.0"
-accelerate = "^0.18.0"
-bitsandbytes = "^0.38.1"
-transformers = "^4.27.4"
+permissions:
+  contents: read
 
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.10", "3.11"]
 
-[tool.poetry.packages]
-packages = [
-    { include = "jsonai" }
-]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+    - name: Check Python version
+      run: python --version
+    - name: Check installed packages
+      run: pip list
 
-[virtualenvs]
-create = true
-in-project = true
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v3
+      with:
+        python-version: '3.x'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install poetry
+    - name: Create temporary directory and copy files
+      run: |
+        mkdir temp_build
+        shopt -s extglob
+        cp -r !(temp_build) temp_build/
+    - name: List directory contents
+      run: |
+        cd temp_build
+        ls -la
+    - name: Build package
+      run: |
+        cd temp_build
+        poetry build
+    - name: List build artifacts
+      run: |
+        cd temp_build/dist
+        ls -la
+    - name: Publish package
+      run: |
+        cd temp_build
+        poetry publish --username __token__ --password ${{ secrets.PYPI_API_TOKEN }}
