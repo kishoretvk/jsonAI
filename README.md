@@ -21,7 +21,7 @@ This currently supports a subset of JSON Schema. Below is a list of the supporte
 - complex object
 
 
-## Bsic Usage 
+## Basic Usage 
 
 
 ## Examples
