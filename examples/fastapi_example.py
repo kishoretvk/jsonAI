@@ -20,8 +20,8 @@ app = FastAPI()
 class GenerateRequest(BaseModel):
     prompt: str
     json_schema: Optional[Dict[str, Any]] = None
-    output_format: Optional[str] = "json"  # Added output_format option to specify output type (json, xml, yaml)
-    validate_output: Optional[bool] = False  # Added validation option to validate output against schema
+    output_format: Optional[str] = "json"  # Output type (json, xml, yaml)
+    validate_output: Optional[bool] = False  # Validate output
 
 
 @app.post("/generate/")
@@ -46,8 +46,8 @@ async def generate_structured_data(request: GenerateRequest):
             tokenizer=tokenizer,
             json_schema=request.json_schema,
             prompt=request.prompt,
-            output_format=request.output_format,  # Pass output_format
-            validate_output=request.validate_output  # Pass validate_output
+            output_format=request.output_format,
+            validate_output=request.validate_output
         )
         generated_data = jsonformer_instance()
 
@@ -80,6 +80,7 @@ To run this example:
 
 4. Open your browser or a tool like curl/Postman and send a POST request to http://127.0.0.1:8000/generate/
    with a JSON body like:
+   ```json
    {
        "prompt": "Generate a simple object",
        "json_schema": {
@@ -89,12 +90,61 @@ To run this example:
                "age": {"type": "integer"}
            }
        },
-       "output_format": "json",  # or "xml", "yaml"
-       "validate_output": true  # or false
+       "output_format": "json",  // or "xml", "yaml"
+       "validate_output": true   // or false
    }
+   ```
 
-   Or using the default schema:
+   Example using default schema:
+   ```json
    {
        "prompt": "Generate a simple object"
    }
+   ```
+
+   Example requesting XML output:
+   ```json
+   {
+       "prompt": "Generate a simple object with a name and age",
+       "json_schema": {
+           "type": "object",
+           "properties": {
+               "name": {"type": "string"},
+               "age": {"type": "integer"}
+           }
+       },
+       "output_format": "xml"
+   }
+   ```
+
+   Example requesting YAML output:
+   ```json
+   {
+       "prompt": "Generate a simple object with a name and age",
+       "json_schema": {
+           "type": "object",
+           "properties": {
+               "name": {"type": "string"},
+               "age": {"type": "integer"}
+           }
+       },
+       "output_format": "yaml"
+   }
+   ```
+
+   Example with validation enabled:
+   ```json
+   {
+       "prompt": "Generate a simple object with a name and age",
+       "json_schema": {
+           "type": "object",
+           "properties": {
+               "name": {"type": "string"},
+               "age": {"type": "integer"}
+           },
+           "required": ["name", "age"]
+       },
+       "validate_output": true
+   }
+   ```
 """
