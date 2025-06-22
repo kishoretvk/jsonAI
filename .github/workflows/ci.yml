@@ -29,10 +29,9 @@ jobs:
     - name: Build package
       run: poetry build
 
-    # Add steps for linting and testing here later
-    # - name: Lint with flake8
-    #   run: |
-    #     poetry run flake8 .
-    # - name: Test with pytest
-    #   run: |
-    #     poetry run pytest
+    - name: Lint with flake8
+      run: |
+        poetry run flake8 .
+    - name: Test with pytest
+      run: |
+        poetry run pytest

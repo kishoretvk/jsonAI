@@ -4,6 +4,7 @@ version = "0.12.0"
 description = ""
 authors = ["1rgs <kishoretvk9@gmail.com>"]
 readme = "README.md"
+include = ["jsonAI"] # Corrected package inclusion
 
 [tool.poetry.dependencies]
 python = "^3.9,<4.0"
@@ -23,10 +24,6 @@ transformers = "^4.27.4"
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
-[tool.poetry.packages]
-packages = [
-    { include = "jsonai" }
-]
 
 [virtualenvs]
 create = true
