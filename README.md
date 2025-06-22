@@ -6,22 +6,155 @@ The idea to create json structures with strong typed schemas is now possible, wi
 
 This currently supports a subset of JSON Schema. Below is a list of the supported schema types:
 
-- number 
+- number
 - integer
 - boolean
 - string  (descriptions also enabled to satisfy summary)
 - datetime
 - date
-- time 
+- time
 - UUID
 - binary data
-### combinations 
+### combinations
 - arrays
 - enums
 - complex object
 
+## Supported Output Formats
 
-## Basic Usage 
+In addition to JSON, `jsonAI` now supports generating output in XML and YAML formats. You can specify the desired format using the `output_format` parameter in the `Jsonformer` constructor.
+
+**XML Output Example:**
+
+```python
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from jsonAI.main import Jsonformer
+
+model = AutoModelForCausalLM.from_pretrained("gpt2")
+tokenizer = AutoTokenizer.from_pretrained("gpt2")
+
+json_schema = {
+    "type": "object",
+    "properties": {
+        "book": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string"},
+                "author": {"type": "string"},
+                "year": {"type": "integer"}
+            }
+        }
+    }
+}
+
+prompt = "Generate information about a book."
+
+jsonformer = Jsonformer(
+    model=model,
+    tokenizer=tokenizer,
+    json_schema=json_schema,
+    prompt=prompt,
+    output_format="xml"
+)
+
+generated_data = jsonformer()
+print(generated_data)
+```
+
+**YAML Output Example:**
+
+```python
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from jsonAI.main import Jsonformer
+
+model = AutoModelForCausalLM.from_pretrained("gpt2")
+tokenizer = AutoTokenizer.from_pretrained("gpt2")
+
+json_schema = {
+    "type": "object",
+    "properties": {
+        "person": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "age": {"type": "integer"},
+                "isStudent": {"type": "boolean"}
+            }
+        }
+    }
+}
+
+prompt = "Generate information about a person."
+
+jsonformer = Jsonformer(
+    model=model,
+    tokenizer=tokenizer,
+    json_schema=json_schema,
+    prompt=prompt,
+    output_format="yaml"
+)
+
+generated_data = jsonformer()
+print(generated_data)
+```
+
+## Output Validation
+
+You can enable schema validation for the generated output by setting the `validate_output` parameter to `True`. This requires the `jsonschema` library to be installed (`pip install jsonschema`).
+
+```python
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from jsonAI.main import Jsonformer
+
+model = AutoModelForCausalLM.from_pretrained("gpt2")
+tokenizer = AutoTokenizer.from_pretrained("gpt2")
+
+json_schema = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "age": {"type": "integer", "minimum": 0}
+    },
+    "required": ["name", "age"]
+}
+
+prompt = "Generate a person's information."
+
+# This will raise a jsonschema.exceptions.ValidationError if the output doesn't match the schema
+jsonformer = Jsonformer(
+    model=model,
+    tokenizer=tokenizer,
+    json_schema=json_schema,
+    prompt=prompt,
+    validate_output=True
+)
+
+generated_data = jsonformer()
+print(generated_data)
+```
+
+## Examples
+
+We have included examples to demonstrate how to integrate `jsonAI` with other libraries and frameworks. You can find them in the `examples/` directory.
+
+### FastAPI Integration Example
+
+This example shows how to use `jsonAI` within a FastAPI web application to create an API endpoint that generates structured data based on user input.
+
+To run the FastAPI example:
+
+1.  Install necessary dependencies:
+    ```bash
+    pip install fastapi uvicorn transformers torch jsonschema PyYAML
+    ```
+2.  Navigate to the `examples/` directory.
+3.  Run the server:
+    ```bash
+    uvicorn fastapi_example:app --reload
+    ```
+4.  Send a POST request to `http://127.0.0.1:8000/generate/` with a JSON body containing `prompt` and optionally `json_schema`, `output_format`, and `validate_output`. See the comments in `examples/fastapi_example.py` for more details.
+
+## Basic Usage
 
 
 ## Examples

@@ -9,6 +9,7 @@ readme = "README.md"
 python = "^3.9,<4.0"
 termcolor = "^2.3.0"
 jaxtyping = "^0.2.28"
+jsonschema = "^4.22.0" # Add jsonschema for validation
 
 [tool.poetry.group.dev.dependencies]
 pandas = "^2.2.2"
