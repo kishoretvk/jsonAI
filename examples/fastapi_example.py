@@ -9,7 +9,7 @@ from jsonAI.main import Jsonformer
 
 # Load a small model and tokenizer for the example
 # In a real application, you might load a larger model
-model_name = "gpt2" # Using gpt2 as a small example model
+model_name = "gpt2"  # Using gpt2 as a small example model
 model = AutoModelForCausalLM.from_pretrained(model_name)
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 
@@ -20,8 +20,8 @@ app = FastAPI()
 class GenerateRequest(BaseModel):
     prompt: str
     json_schema: Optional[Dict[str, Any]] = None
-    output_format: Optional[str] = "json"  # Added output_format option
-    validate_output: Optional[bool] = False  # Added validation option
+    output_format: Optional[str] = "json"  # Added output_format option to specify output type (json, xml, yaml)
+    validate_output: Optional[bool] = False  # Added validation option to validate output against schema
 
 
 @app.post("/generate/")
@@ -62,6 +62,7 @@ async def generate_structured_data(request: GenerateRequest):
 
     except Exception as e:
         # Basic error handling
+        print(f"An error occurred: {e}") # Log the error
         return {"error": str(e)}
 
 
