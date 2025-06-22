@@ -59,9 +59,15 @@ def get_prefix_tokens_for_types(tokenizer: PreTrainedTokenizer) -> Dict[str, Lis
         "boolean": [v for k, v in vocab if is_boolean_prefix(k)],
         "null": [v for k, v in vocab if is_null_prefix(k)],
         "string": [v for k, v in vocab if is_string_prefix(k)],
-        "datetime": [v for k, v in vocab if is_datetime_prefix(k)],
+        "datetime": [
+            v for k, v in vocab 
+            if is_datetime_prefix(k)
+        ],
         "date": [v for k, v in vocab if is_date_prefix(k)],
         "time": [v for k, v in vocab if is_time_prefix(k)],
-        "uuid": [v for k, v in vocab if is_uuid_prefix(k)],
+        "uuid": [
+            v for k, v in vocab 
+            if is_uuid_prefix(k)
+        ],
         "binary": [v for k, v in vocab if is_binary_prefix(k)],
     }

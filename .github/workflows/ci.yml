@@ -11,14 +11,17 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"] # Test against multiple Python versions
 
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Python
+    - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
       with:
-        python-version: '3.x'
+        python-version: ${{ matrix.python-version }}
 
     - name: Install Poetry
       run: pip install poetry
@@ -32,6 +35,12 @@ jobs:
     - name: Lint with flake8
       run: |
         poetry run flake8 .
-    - name: Test with pytest
+    - name: Test with pytest and Coverage
       run: |
-        poetry run pytest
+        poetry run pytest --cov=jsonAI --cov-report=xml # Run tests with coverage and generate XML report
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }} # Ensure you have a CODECOV_TOKEN secret in your repo settings
+        files: ./coverage.xml # Path to the coverage report file
+        fail_ci_if_error: true # Fail CI if Codecov upload fails
