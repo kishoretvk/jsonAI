@@ -15,15 +15,17 @@ def round_to_nsf(num, nsf):
 
 
 def get_valid_next_choices(
-        choices_tokens: List[Int[Tensor]], 
-        current_tokens: Int[Tensor]
+    choices_tokens: List[Int[Tensor]],
+    current_tokens: Int[Tensor]
     ):
     next_choices = []
     for choice_tokens in choices_tokens:
         # if we have some more slots left
         if len(current_tokens) < len(choice_tokens):
             # see if current_tokens matches
-            if (choice_tokens[: len(current_tokens)] == current_tokens).all():
+            if (
+                choice_tokens[: len(current_tokens)] == current_tokens
+            ).all():
                 c = choice_tokens[len(current_tokens)].item()
                 next_choices.append(c)
 
