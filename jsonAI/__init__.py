@@ -1,2 +1,2 @@
-from jsonAI.main import Jsonformer
-from jsonAI.format import highlight_values
+from .main import Jsonformer
+from .format import highlight_values
