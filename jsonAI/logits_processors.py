@@ -1,4 +1,3 @@
-from typing import List
 from transformers import PreTrainedTokenizer, LogitsWarper, StoppingCriteria
 import torch
 
@@ -52,7 +51,7 @@ class NumberStoppingCriteria(StoppingCriteria):
         scores: torch.FloatTensor,
     ) -> bool:
         decoded = self.tokenizer.decode(
-            input_ids[0][self.prompt_length :], skip_special_tokens=True
+            input_ids[0][self.prompt_length:], skip_special_tokens=True
         )
 
         if decoded.count(".") > 1:
@@ -129,7 +128,7 @@ class IntegerStoppingCriteria(StoppingCriteria):
         scores: torch.FloatTensor,
     ) -> bool:
         decoded = self.tokenizer.decode(
-            input_ids[0][self.prompt_length :], skip_special_tokens=True
+            input_ids[0][self.prompt_length:], skip_special_tokens=True
         )
 
         if len(decoded.strip()) > self.max_digits:
