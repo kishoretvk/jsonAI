@@ -524,7 +524,7 @@ class Jsonformer:
                 self.debug("[__call__]", "Output validated successfully against schema.")
             except ValidationError as e:
                 self.debug("[__call__]", f"Output validation failed: {e}", is_prompt=True)
-                raise ValidationError(f"Generated output failed schema validation: {e}")
+                raise ValidationError(f"Generated output failed schema validation: {str(e)}")
 
         # Format output based on self.output_format
         if self.output_format == "json":
