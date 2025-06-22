@@ -23,24 +23,6 @@ import torch
 GENERATION_MARKER = "|GENERATION|"
 
 
-
-from jsonAI.logits_processors import (
-    NumberStoppingCriteria,
-    OutputNumbersTokens,
-    IntegerStoppingCriteria,
-    OutputIntegersTokens,
-    StringStoppingCriteria,
-)
-from jsonAI.prob_choice_tree import prob_choice_tree, round_to_nsf
-from jsonAI.type_prefixes import get_prefix_tokens_for_types
-
-from termcolor import cprint
-from transformers import PreTrainedModel, PreTrainedTokenizer
-import json
-import torch
-
-GENERATION_MARKER = "|GENERATION|"
-
 class Jsonformer:
     value: Dict[str, Any] = {}
 
@@ -140,7 +122,7 @@ class Jsonformer:
             return float(response)
         except ValueError:
             if iterations > 3:
-                raise ValueError(f"Failed to generate a valid number after multiple attempts for prompt: '{self.prompt}'")
+                raise ValueError("Failed to generate a valid number")
 
             return self.generate_number(
                 temperature=self.temperature * 1.3, iterations=iterations + 1
@@ -511,6 +493,7 @@ class Jsonformer:
 
     def __call__(self) -> Dict[str, Any]:
         self.value = {}
+
     def _to_xml(self, data, element_name="item"):
         # Helper function to convert Python dict/list/primitive to XML Element
         if isinstance(data, dict):
@@ -568,51 +551,6 @@ class Jsonformer:
             return yaml.dump(generated_data, indent=2, default_flow_style=False)
         else:
             raise ValueError(f"Unsupported output format: {self.output_format}. Supported formats are 'json', 'xml', 'yaml'.")
-from typing import List, Set, Union, Dict, Any
-from datetime import datetime, date, time
-import uuid
-import base64
-import xml.etree.ElementTree as ET # Import for XML
-import yaml # Import for YAML
-from jsonschema import validate, ValidationError # Import for validation
-from jsonAI.logits_processors import (
-    NumberStoppingCriteria,
-    OutputNumbersTokens,
-    IntegerStoppingCriteria,
-    OutputIntegersTokens,
-    StringStoppingCriteria,
-)
-from jsonAI.prob_choice_tree import prob_choice_tree, round_to_nsf
-from jsonAI.type_prefixes import get_prefix_tokens_for_types
-
-from termcolor import cprint
-from transformers import PreTrainedModel, PreTrainedTokenizer
-import json
-import torch
-
-GENERATION_MARKER = "|GENERATION|"
-
-
-
-from jsonAI.logits_processors import (
-    NumberStoppingCriteria,
-    OutputNumbersTokens,
-    IntegerStoppingCriteria,
-    OutputIntegersTokens,
-    StringStoppingCriteria,
-)
-from jsonAI.prob_choice_tree import prob_choice_tree, round_to_nsf
-from jsonAI.type_prefixes import get_prefix_tokens_for_types
-
-from termcolor import cprint
-from transformers import PreTrainedModel, PreTrainedTokenizer
-import json
-import torch
-
-GENERATION_MARKER = "|GENERATION|"
-
-class Jsonformer:
-    value: Dict[str, Any] = {}
 
     def __init__(
         self,
@@ -776,9 +714,9 @@ class Jsonformer:
             return int(response)
         except ValueError:
             if iterations > 3:
-                raise ValueError("Failed to generate a valid integer")
+                raise ValueError(f"Failed to generate a valid integer after multiple attempts for prompt: '{self.prompt}'")
 
-            return self.generate_integer(temperature=self.temperature * 1.3)
+            return self.generate_integer(temperature=self.temperature * 1.3, iterations=iterations + 1)
         
     def generate_binary(self) -> str:
         prompt = self.get_prompt()

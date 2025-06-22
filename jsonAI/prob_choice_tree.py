@@ -13,7 +13,7 @@ def round_to_nsf(num, nsf):
     else:
         return 0  # Can't take the log of 0
 
-def get_valid_next_choices(choices_tokens, current_tokens):
+def get_valid_next_choices(choices_tokens: List[Int[Tensor, "seq"]], current_tokens: Int[Tensor, "seq"]):
     next_choices = []
     for choice_tokens in choices_tokens:
         # if we have some more slots left
@@ -51,14 +51,14 @@ def _prob_choice_tree(
         logits_constrained = o.logits[0, -1][next_choices]
         probs = F.softmax(logits_constrained, dim=-1)
         for i in range(len(next_choices)):
-            next_choice = next_choices[i]
+            next_choice_tensor = torch.LongTensor([next_choices[i]])
             next_prob = prob * probs[i].item()
-            yield from prob_choice_tree(
+            yield from _prob_choice_tree(
                 model=model,
                 tokenizer=tokenizer,
                 choices_tokens=choices_tokens,
                 input_ids=input_ids,
-                choice=next_choice,
+                choice=next_choice_tensor,
                 prob=next_prob,
                 current_tokens=current_tokens,
             )

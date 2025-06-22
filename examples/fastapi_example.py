@@ -1,4 +1,3 @@
-import uvicorn
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
@@ -14,13 +13,16 @@ model_name = "gpt2" # Using gpt2 as a small example model
 model = AutoModelForCausalLM.from_pretrained(model_name)
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 
+
 app = FastAPI()
+
 
 class GenerateRequest(BaseModel):
     prompt: str
     json_schema: Optional[Dict[str, Any]] = None
-    output_format: Optional[str] = "json" # Added output_format option
-    validate_output: Optional[bool] = False # Added validation option
+    output_format: Optional[str] = "json"  # Added output_format option
+    validate_output: Optional[bool] = False  # Added validation option
+
 
 @app.post("/generate/")
 async def generate_structured_data(request: GenerateRequest):
@@ -36,7 +38,7 @@ async def generate_structured_data(request: GenerateRequest):
                 "value": {"type": "integer"}
             }
         }
-        print("Using default schema:", request.json_schema) # Log default schema usage
+        print("Using default schema:", request.json_schema)  # Log default schema usage
 
     try:
         jsonformer_instance = Jsonformer(
@@ -44,24 +46,24 @@ async def generate_structured_data(request: GenerateRequest):
             tokenizer=tokenizer,
             json_schema=request.json_schema,
             prompt=request.prompt,
-            output_format=request.output_format, # Pass output_format
-            validate_output=request.validate_output # Pass validate_output
+            output_format=request.output_format,  # Pass output_format
+            validate_output=request.validate_output  # Pass validate_output
         )
         generated_data = jsonformer_instance()
 
         # FastAPI automatically handles JSON response for dict/list
         # For XML/YAML, we'll return a plain string response
         if request.output_format == "json":
-             return generated_data
+            return generated_data
         else:
-             # Return as plain text for XML/YAML
-             from fastapi.responses import PlainTextResponse
-             return PlainTextResponse(content=generated_data)
-
+            # Return as plain text for XML/YAML
+            from fastapi.responses import PlainTextResponse
+            return PlainTextResponse(content=generated_data)
 
     except Exception as e:
         # Basic error handling
         return {"error": str(e)}
+
 
 # Instructions on how to run the example
 """
@@ -86,8 +88,8 @@ To run this example:
                "age": {"type": "integer"}
            }
        },
-       "output_format": "json", // or "xml", "yaml"
-       "validate_output": true // or false
+       "output_format": "json",  # or "xml", "yaml"
+       "validate_output": true  # or false
    }
 
    Or using the default schema:
