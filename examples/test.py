@@ -1,15 +1,13 @@
 import json
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from jsonAI import Jsonformer
-import xml.etree.ElementTree as ET
-import yaml
-from jsonschema import validate, ValidationError
+from jsonschema import ValidationError
 
 # --- Configuration ---
 # Using a small local transformers model for demonstration
 # Replace with your desired local model if needed (e.g., "gpt2")
 MODEL_NAME = "gpt2"
-DEBUG_MODE = True # Set to True to see debug output
+DEBUG_MODE = True  # Set to True to see debug output
 
 # --- Load Model and Tokenizer ---
 print(f"Loading model: {MODEL_NAME}")
@@ -177,6 +175,8 @@ except Exception as e:
 
 # --- Instructions ---
 print("\n--- Instructions ---")
-print(f"To run this test file, make sure you have the '{MODEL_NAME}' model accessible")
+print(
+    f"To run this test file, make sure you have the '{MODEL_NAME}' model accessible"
+)
 print("and the project dependencies installed (`poetry install`).")
 print("Then run: poetry run python test.py")
