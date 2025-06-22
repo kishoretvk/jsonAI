@@ -1,10 +1,10 @@
 from typing import List, Set, Union, Dict, Any
-from datetime import datetime, date, time
+from datetime import datetime, date  # time is unused
 import uuid
 import base64
-import xml.etree.ElementTree as ET # Import for XML
-import yaml # Import for YAML
-from jsonschema import validate, ValidationError # Import for validation
+import xml.etree.ElementTree as ET  # For XML
+import yaml  # For YAML
+from jsonschema import validate, ValidationError  # For validation
 from jsonAI.logits_processors import (
     NumberStoppingCriteria,
     OutputNumbersTokens,
@@ -38,8 +38,8 @@ class Jsonformer:
         max_number_tokens: int = 6,
         temperature: float = 1.0,
         max_string_token_length: int = 175,
-        output_format: str = "json", # Add output format parameter
-        validate_output: bool = False, # Add validation parameter
+        output_format: str = "json",  # Output format
+        validate_output: bool = False,  # Validation flag
     ):
         self.model = model
         self.tokenizer = tokenizer
