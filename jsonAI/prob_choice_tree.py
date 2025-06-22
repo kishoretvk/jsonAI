@@ -14,7 +14,7 @@ def round_to_nsf(num, nsf):
         return 0  # Can't take the log of 0
 
 
-def get_valid_next_choices(choices_tokens: List[Int[Tensor, "seq"]], current_tokens: Int[Tensor, "seq"]):
+def get_valid_next_choices(choices_tokens: List[Int[Tensor]], current_tokens: Int[Tensor]):
     next_choices = []
     for choice_tokens in choices_tokens:
         # if we have some more slots left
@@ -31,11 +31,11 @@ def get_valid_next_choices(choices_tokens: List[Int[Tensor, "seq"]], current_tok
 def _prob_choice_tree(
     model: AutoModelForCausalLM,
     tokenizer: AutoTokenizer,
-    input_ids: Int[Tensor, "seq"],
-    choices_tokens: List[Int[Tensor, "seq"]],
-    choice: Optional[Int[Tensor, ""]] = None,
+    input_ids: Int[Tensor],
+    choices_tokens: List[Int[Tensor]],
+    choice: Optional[Int[Tensor]] = None,
     prob: float = 1,
-    current_tokens: Int[Tensor, "seq"] = torch.LongTensor([]),
+    current_tokens: Int[Tensor] = torch.LongTensor([]),
 ):
     if choice is not None:
         c = choice[None].to(current_tokens.device)
