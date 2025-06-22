@@ -41,7 +41,8 @@ def is_time_prefix(s: str) -> bool:
 
 def is_uuid_prefix(s: str) -> bool:
     return re.match(
-        r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$', s
+        r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+        s
     )
 
 
@@ -52,7 +53,9 @@ def is_binary_prefix(s: str) -> bool:
 def get_prefix_tokens_for_types(tokenizer: PreTrainedTokenizer) -> Dict[str, List[str]]:
     vocab = tokenizer.vocab.items()
     return {
-        "number": [v for k, v in vocab if is_number_prefix(k)],
+        "number": [
+            v for k, v in vocab if is_number_prefix(k)
+        ],
         "boolean": [v for k, v in vocab if is_boolean_prefix(k)],
         "null": [v for k, v in vocab if is_null_prefix(k)],
         "string": [v for k, v in vocab if is_string_prefix(k)],
