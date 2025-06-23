@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
-c
 from transformers import AutoModelForCausalLM, AutoTokenizer
+from fastapi.responses import PlainTextResponse
 
 # Assuming jsonAI is installed or accessible in the Python path
 from jsonAI.main import Jsonformer
@@ -56,7 +56,6 @@ async def generate_structured_data(request: GenerateRequest):
         if request.output_format == "json":
             return generated_data
         else:
-            from fastapi.responses import PlainTextResponse
             return PlainTextResponse(
                 content=generated_data,
                 media_type=(

@@ -198,7 +198,9 @@ class Jsonformer:
             num_return_sequences=1,
             temperature=self.temperature,
             stopping_criteria=[
-                StringStoppingCriteria(self.tokenizer, len(input_tokens[0]), maxLength)
+                StringStoppingCriteria(
+                    self.tokenizer, len(input_tokens[0]), maxLength
+                )
             ],
             pad_token_id=self.tokenizer.eos_token_id,
         )
@@ -287,7 +289,7 @@ class Jsonformer:
             option_probability = (
                 torch.prod(option_token_probabilities) * termination_probability
             )
-            self.debug("[generate_enum]", f"{option_probability}, {option}")  # F541 fix: ensure f-string is valid
+            self.debug("[generate_enum] " + str(option_probability) + ", " + str(option))
 
             if option_probability > highest_probability:
                 best_option = option
@@ -319,7 +321,9 @@ class Jsonformer:
             logits = output.logits[0, -1]
 
             top_indices = logits.topk(30).indices
-            sorted_token_ids = top_indices[logits[top_indices].argsort(descending=True)]
+            sorted_token_ids = top_indices[
+                logits[top_indices].argsort(descending=True)
+            ]
 
             found_comma = False
             found_close_bracket = False
@@ -344,7 +348,7 @@ class Jsonformer:
         possible_types = list(set(possible_types))  # remove duplicates
         self.debug("[choose_type_to_generate]", possible_types)
         if len(possible_types) < 1:
-            raise ValueError(f"Union type must not be empty")
+            raise ValueError("Union type must not be empty")
         elif len(possible_types) == 1:
             return possible_types[0]
 
@@ -359,7 +363,7 @@ class Jsonformer:
             try:
                 prefix_tokens = self.type_prefix_tokens[possible_type]
             except KeyError:
-                raise ValueError(f"Unsupported schema type: {possible_type}")
+            raise ValueError(f"Unsupported schema type: {possible_type}")
             max_type_logit = logits[prefix_tokens].max()
             if max_type_logit > max_logit:
                 max_type = possible_type
@@ -444,7 +448,9 @@ class Jsonformer:
                 obj[key] = self.generation_marker
             else:
                 obj.append(self.generation_marker)
-            return self.generate_p_enum(schema["values"], round=schema.get("round", 3))
+            return self.generate_p_enum(
+                schema["values"], round=schema.get("round", 3)
+            )
         elif schema_type == "p_integer":
             if key:
                 obj[key] = self.generation_marker
@@ -476,7 +482,10 @@ class Jsonformer:
             raise ValueError(f"Unsupported schema type: {schema_type}")
 
     def get_prompt(self):
-        template = """{prompt}\nOutput result in the following JSON schema format:\n```json{schema}```\nResult: ```json\n{progress}"""
+        template = (
+            """{prompt}\nOutput result in the following JSON schema format:\n"""
+            """```json{schema}```\nResult: ```json\n{progress}"""
+        )
         value = self.value
 
         progress = json.dumps(value)
@@ -564,4 +573,7 @@ class Jsonformer:
             # Convert generated_data (dict/list) to YAML string
             return yaml.dump(generated_data, indent=2, default_flow_style=False)
         else:
-            raise ValueError(f"Unsupported output format: {self.output_format}. Supported formats are 'json', 'xml', 'yaml'.")
+            raise ValueError(
+                f"Unsupported output format: {self.output_format}. "
+                "Supported formats are 'json', 'xml', 'yaml'."
+            )
