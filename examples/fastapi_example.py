@@ -20,8 +20,8 @@ app = FastAPI()
 class GenerateRequest(BaseModel):
     prompt: str
     json_schema: Optional[Dict[str, Any]] = None
-    output_format: Optional[str] = "json"  # Output type (json, xml, yaml)
-    validate_output: Optional[bool] = False  # Validate output
+    output_format: Optional[str] = "json"   # Output type (json, xml, yaml)
+    validate_output: Optional[bool] = False   # Validate output
 
 
 @app.post("/generate/")
@@ -52,13 +52,16 @@ async def generate_structured_data(request: GenerateRequest):
         generated_data = jsonformer_instance()
 
         # FastAPI automatically handles JSON response for dict/list
-        # For XML/YAML, we'll return a plain string response
+        # For XML/YAML, return plain text response
         if request.output_format == "json":
             return generated_data
         else:
-            # Return as plain text for XML/YAML
             from fastapi.responses import PlainTextResponse
-            return PlainTextResponse(content=generated_data)
+            return PlainTextResponse(
+                content=generated_data,
+                media_type=("application/xml" if request.output_format == "xml" 
+                            else "application/yaml")
+            )
 
     except Exception as e:
         # Basic error handling

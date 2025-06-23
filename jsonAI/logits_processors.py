@@ -4,7 +4,10 @@ import torch
 
 class StringStoppingCriteria(StoppingCriteria):
     def __init__(
-        self, tokenizer: PreTrainedTokenizer, prompt_length: int, max_length: int = None
+        self,
+        tokenizer: PreTrainedTokenizer,
+        prompt_length: int,
+        max_length: int = None
     ):
         self.tokenizer = tokenizer
         self.prompt_length = prompt_length
@@ -19,7 +22,9 @@ class StringStoppingCriteria(StoppingCriteria):
             return False
 
         last_token_id = input_ids[0][-1]
-        last_token = self.tokenizer.decode(last_token_id, skip_special_tokens=True)
+        last_token = self.tokenizer.decode(
+            last_token_id, skip_special_tokens=True
+        )
 
         result = '"' in last_token
 
@@ -51,7 +56,8 @@ class NumberStoppingCriteria(StoppingCriteria):
         scores: torch.FloatTensor,
     ) -> bool:
         decoded = self.tokenizer.decode(
-            input_ids[0][self.prompt_length:], skip_special_tokens=True
+            input_ids[0][self.prompt_length:],
+            skip_special_tokens=True
         )
 
         if decoded.count(".") > 1:
@@ -98,7 +104,10 @@ class OutputNumbersTokens(LogitsWarper):
                 )
                 or (
                     "," in token_str
-                    and all(c.isdigit() or c == "." for c in token_str.split(",")[0])
+                    and all(
+                        c.isdigit() or c == "."
+                        for c in token_str.split(",")[0]
+                    )
                     and token_str.count(".") <= 1
                 )
             ):
@@ -137,7 +146,9 @@ class IntegerStoppingCriteria(StoppingCriteria):
         if (
             len(decoded) > 1
             and "," in decoded
-            and any(c.isdigit() for c in decoded.split(",")[0])
+            and any(
+                c.isdigit() for c in decoded.split(",")[0]
+            )
         ):
             return True
 
@@ -164,8 +175,12 @@ class OutputIntegersTokens(LogitsWarper):
             if (
                 token_str == ""
                 or all(c.isdigit() for c in token_str)
-                or "," in token_str
-                and all(c.isdigit() for c in token_str.split(",")[0])
+                or (
+                    "," in token_str
+                    and all(
+                        c.isdigit() for c in token_str.split(",")[0]
+                    )
+                )
             ):
                 self.allowed_mask[token_id] = True
 
