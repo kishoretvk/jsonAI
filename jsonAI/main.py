@@ -302,7 +302,8 @@ class Jsonformer:
         return obj
 
     def generate_array(self, item_schema: Dict[str, Any], obj: Dict[str, Any]) -> list:
-        for _ in range(self.max_array_length):
+        array_length_limit = item_schema.get("maxLength", self.max_array_length)
+        for _ in range(array_length_limit):
             element = self.generate_value(item_schema, obj)
             obj[-1] = element
 
@@ -489,20 +490,20 @@ class Jsonformer:
 
         return prompt
 
-    def _to_xml(self, data, element_name="item"):
+    def _to_xml(self, data, element_name="item", item_name: str = "item"):
         # Helper function to convert Python dict/list/primitive to XML Element
         if isinstance(data, dict):
             element = ET.Element(element_name)
             for key, value in data.items():
-                child = self._to_xml(value, key)
+                child = self._to_xml(value, key, item_name=key) # Pass key as item_name for nested objects
                 element.append(child)
             return element
         elif isinstance(data, list):
             # For lists, create a container element and add each item
             element = ET.Element(element_name)
             for item in data:
-                 # Use a generic item name for list items
-                 item_element = self._to_xml(item, "item") # Using "item" as default list item name
+                 # Use the provided item_name for list items
+                 item_element = self._to_xml(item, item_name)
                  element.append(item_element)
             return element
         else:
@@ -534,9 +535,15 @@ class Jsonformer:
             # Need a root element name. Let's use "root" or infer from schema if possible (complex).
             # For now, use "root" if the top level is a dict, or "list" if it's a list.
             if isinstance(generated_data, dict):
-                 root_element = self._to_xml(generated_data, "root") # Default root name for dict
+                 # Attempt to use the schema's title or a default "root"
+                 root_name = self.json_schema.get("title", "root")
+                 root_element = self._to_xml(generated_data, root_name)
             elif isinstance(generated_data, list):
-                 root_element = self._to_xml(generated_data, "list") # Default root name for list
+                 # Attempt to use the schema's title or a default "list"
+                 root_name = self.json_schema.get("title", "list")
+                 # For lists, we also need to pass the item name from the schema if available
+                 item_name = self.json_schema.get("items", {}).get("title", "item")
+                 root_element = self._to_xml(generated_data, root_name, item_name=item_name)
             else:
                  # Should not happen with current generate_object/array logic, but handle
                  root_element = self._to_xml({"value": generated_data}, "root") # Wrap primitive in a root
