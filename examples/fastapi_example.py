@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
-
+c
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 # Assuming jsonAI is installed or accessible in the Python path
@@ -20,8 +20,8 @@ app = FastAPI()
 class GenerateRequest(BaseModel):
     prompt: str
     json_schema: Optional[Dict[str, Any]] = None
-    output_format: Optional[str] = "json"   # Output type (json, xml, yaml)
-    validate_output: Optional[bool] = False   # Validate output
+    output_format: Optional[str] = "json"  # Output type (json, xml, yaml)
+    validate_output: Optional[bool] = False  # Validate output
 
 
 @app.post("/generate/")
@@ -59,13 +59,16 @@ async def generate_structured_data(request: GenerateRequest):
             from fastapi.responses import PlainTextResponse
             return PlainTextResponse(
                 content=generated_data,
-                media_type=("application/xml" if request.output_format == "xml" 
-                            else "application/yaml")
+                media_type=(
+                    "application/xml"
+                    if request.output_format == "xml"
+                    else "application/yaml"
+                ),
             )
 
     except Exception as e:
         # Basic error handling
-        print(f"An error occurred: {e}") # Log the error
+        print(f"An error occurred: {e}")  # Log the error
         return {"error": str(e)}
 
 

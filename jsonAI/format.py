@@ -11,7 +11,7 @@ def highlight_values(value):
                 recursive_print(
                     value, indent + 2, key == last_key
                 )
-            print(f"{' ' * indent}}}", 
+            print(f"{' ' * indent}}}",
                   end=",\n" if not is_last_element else "\n")
         elif isinstance(obj, list):
             print("[")
@@ -20,13 +20,13 @@ def highlight_values(value):
                 recursive_print(
                     value, indent + 2, index == len(obj) - 1
                 )
-            print(f"{' ' * indent}]", 
+            print(f"{' ' * indent}]",
                   end=",\n" if not is_last_element else "\n")
         else:
             if isinstance(obj, str):
                 obj = f'"{obj}"'
             print(
-                colored(obj, "green"), 
+                colored(obj, "green"),
                 end=",\n" if not is_last_element else "\n"
             )
 

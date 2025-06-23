@@ -45,8 +45,8 @@ class Jsonformer:
         self.tokenizer = tokenizer
         self.json_schema = json_schema
         self.prompt = prompt
-        self.output_format = output_format.lower() # Store output format
-        self.validate_output = validate_output # Store validation flag
+        self.output_format = output_format.lower()  # Store output format
+        self.validate_output = validate_output  # Store validation flag
 
         self.type_prefix_tokens = get_prefix_tokens_for_types(tokenizer)
 
@@ -155,9 +155,13 @@ class Jsonformer:
             return int(response)
         except ValueError:
             if iterations > 3:
-                raise ValueError(f"Failed to generate a valid integer after multiple attempts for prompt: '{self.prompt}'")
+                raise ValueError(
+                    f"Failed to generate a valid integer after multiple attempts for prompt: '{self.prompt}'"
+                )
 
-            return self.generate_integer(temperature=self.temperature * 1.3, iterations=iterations + 1)
+            return self.generate_integer(
+                temperature=self.temperature * 1.3, iterations=iterations + 1
+            )
 
     def generate_binary(self) -> str:
         prompt = self.get_prompt()
@@ -283,7 +287,7 @@ class Jsonformer:
             option_probability = (
                 torch.prod(option_token_probabilities) * termination_probability
             )
-            self.debug("[generate_enum]", f"{option_probability}, {option}")
+            self.debug("[generate_enum]", f"{option_probability}, {option}")  # F541 fix: ensure f-string is valid
 
             if option_probability > highest_probability:
                 best_option = option
@@ -524,8 +528,12 @@ class Jsonformer:
                 validate(instance=generated_data, schema=self.json_schema)
                 self.debug("[__call__]", "Output validated successfully against schema.")
             except ValidationError as e:
-                self.debug("[__call__]", f"Output validation failed: {e}", is_prompt=True)
-                raise ValidationError(f"Generated output failed schema validation: {str(e)}")
+                self.debug(
+                    "[__call__]", f"Output validation failed: {e}", is_prompt=True
+                )
+                raise ValidationError(
+                    f"Generated output failed schema validation: {str(e)}"
+                )
 
         # Format output based on self.output_format
         if self.output_format == "json":
@@ -535,18 +543,22 @@ class Jsonformer:
             # Need a root element name. Let's use "root" or infer from schema if possible (complex).
             # For now, use "root" if the top level is a dict, or "list" if it's a list.
             if isinstance(generated_data, dict):
-                 # Attempt to use the schema's title or a default "root"
-                 root_name = self.json_schema.get("title", "root")
-                 root_element = self._to_xml(generated_data, root_name)
+                # Attempt to use the schema's title or a default "root"
+                root_name = self.json_schema.get("title", "root")
+                root_element = self._to_xml(generated_data, root_name)
             elif isinstance(generated_data, list):
-                 # Attempt to use the schema's title or a default "list"
-                 root_name = self.json_schema.get("title", "list")
-                 # For lists, we also need to pass the item name from the schema if available
-                 item_name = self.json_schema.get("items", {}).get("title", "item")
-                 root_element = self._to_xml(generated_data, root_name, item_name=item_name)
+                # Attempt to use the schema's title or a default "list"
+                root_name = self.json_schema.get("title", "list")
+                # For lists, we also need to pass the item name from the schema if available
+                item_name = self.json_schema.get("items", {}).get("title", "item")
+                root_element = self._to_xml(
+                    generated_data, root_name, item_name=item_name
+                )
             else:
-                 # Should not happen with current generate_object/array logic, but handle
-                 root_element = self._to_xml({"value": generated_data}, "root") # Wrap primitive in a root
+                # Should not happen with current generate_object/array logic, but handle
+                root_element = self._to_xml(
+                    {"value": generated_data}, "root"
+                )  # Wrap primitive in a root
             return ET.tostring(root_element, encoding='unicode')
         elif self.output_format == "yaml":
             # Convert generated_data (dict/list) to YAML string

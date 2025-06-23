@@ -163,7 +163,7 @@ try:
         prompt=prompt_5,
         debug=DEBUG_MODE,
         output_format="json",
-        validate_output=True # Enable validation
+        validate_output=True  # Enable validation
     )
     output_json_5 = jsonformer_5()
     print("Generated JSON (with validation enabled):")
