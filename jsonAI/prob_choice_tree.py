@@ -17,7 +17,7 @@ def round_to_nsf(num, nsf):
 def get_valid_next_choices(
     choices_tokens: List[Int[Tensor]],
     current_tokens: Int[Tensor]
-    ):
+):
     next_choices = []
     for choice_tokens in choices_tokens:
         # if we have some more slots left
