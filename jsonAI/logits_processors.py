@@ -7,7 +7,7 @@ class StringStoppingCriteria(StoppingCriteria):
         self,
         tokenizer: PreTrainedTokenizer,
         prompt_length: int,
-        max_length: int=None
+        max_length: int = None,
     ):
         self.tokenizer = tokenizer
         self.prompt_length = prompt_length
@@ -22,14 +22,13 @@ class StringStoppingCriteria(StoppingCriteria):
             return False
 
         last_token_id = input_ids[0][-1]
-        last_token = self.tokenizer.decode(
-            last_token_id, skip_special_tokens=True
-        )
+        last_token = self.tokenizer.decode(last_token_id, skip_special_tokens=True)
 
         result = '"' in last_token
 
         if self.max_length is not None:
-            # because of tokens this wont work pefectly, we might go 0-10 chars over
+            # Due to token handling, max_length check may not be accurate
+            # Could exceed by up to 10 characters
             gen_ids = input_ids[0][self.prompt_length :]
             o = self.tokenizer.decode(gen_ids, skip_special_tokens=True)
             str_l = len(o)
@@ -56,8 +55,7 @@ class NumberStoppingCriteria(StoppingCriteria):
         scores: torch.FloatTensor,
     ) -> bool:
         decoded = self.tokenizer.decode(
-            input_ids[0][self.prompt_length:],
-            skip_special_tokens=True
+            input_ids[0][self.prompt_length:], skip_special_tokens=True
         )
 
         if decoded.count(".") > 1:
@@ -72,9 +70,7 @@ class NumberStoppingCriteria(StoppingCriteria):
         if (
             len(decoded) > 1
             and "," in decoded
-            and any(
-                c.isdigit() for c in decoded.split(",")[0]
-            )
+            and any(c.isdigit() for c in decoded.split(",")[0])
         ):
             return True
 
@@ -96,7 +92,7 @@ class OutputNumbersTokens(LogitsWarper):
         self.allowed_mask = torch.zeros(vocab_size, dtype=torch.bool)
 
         for _, token_id in tokenizer.get_vocab().items():
-            token_str = tokenizer.decode(token_id, skip_special_tokens=True).strip()
+            token_str = self.tokenizer.decode(token_id, skip_special_tokens=True).strip()
 
             if (
                 token_str == ""
@@ -175,7 +171,7 @@ class OutputIntegersTokens(LogitsWarper):
         self.allowed_mask = torch.zeros(vocab_size, dtype=torch.bool)
 
         for _, token_id in tokenizer.get_vocab().items():
-            token_str = tokenizer.decode(token_id, skip_special_tokens=True).strip()
+            token_str = self.tokenizer.decode(token_id, skip_special_tokens=True).strip()
 
             if (
                 token_str == ""

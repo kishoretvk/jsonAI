@@ -76,7 +76,13 @@ async def generate_structured_data(request: GenerateRequest):
 To run this example:
 
 1. Make sure you have jsonAI and necessary dependencies installed:
-   pip install jsonformer fastapi uvicorn transformers torch jsonschema PyYAML
+   pip install jsonformer
+   fastapi
+   uvicorn
+   transformers
+   torch
+   jsonschema
+   PyYAML
 
 2. Save this code as fastapi_example.py
 
