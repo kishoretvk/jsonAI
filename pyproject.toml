@@ -31,7 +31,7 @@ fastapi = "^0.111.0"
 uvicorn = {extras = ["standard"], version = "^0.30.1"}
 
 [build-system]
-requires = ["poetry-core>=1.0.0"
+requires = ["poetry-core>=1.0.0"] # FIX: Added the missing closing bracket here
 build-backend = "poetry.core.masonry.api"
 
 
