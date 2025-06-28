@@ -1,5 +1,5 @@
 import torch
-from typing import Union
+from typing import Union, Callable
 from transformers import PreTrainedModel, PreTrainedTokenizer
 from jsonAI.logits_processors import (
     NumberStoppingCriteria,
@@ -18,14 +18,14 @@ class TypeGenerator:
         self,
         model: PreTrainedModel,
         tokenizer: PreTrainedTokenizer,
-        debug: bool = False,
+        debug: Callable,
         max_number_tokens: int = 6,
         max_string_token_length: int = 175,
         temperature: float = 1.0,
     ):
         self.model = model
         self.tokenizer = tokenizer
-        self.debug_on = debug
+        self.debug = debug
         self.max_number_tokens = max_number_tokens
         self.max_string_token_length = max_string_token_length
         self.temperature = temperature
@@ -33,15 +33,6 @@ class TypeGenerator:
         self.type_prefix_tokens = get_prefix_tokens_for_types(tokenizer)
         self.number_logit_processor = OutputNumbersTokens(tokenizer)
         self.integer_logit_processor = OutputIntegersTokens(tokenizer)
-
-    def debug(self, caller: str, value: str, is_prompt: bool = False):
-        if self.debug_on:
-            if is_prompt:
-                cprint(caller, "green", end=" ")
-                cprint(value, "yellow")
-            else:
-                cprint(caller, "green", end=" ")
-                cprint(value, "blue")
 
     def generate_number(
         self, prompt: str, temperature: Union[float, None] = None, iterations=0
@@ -63,7 +54,7 @@ class TypeGenerator:
         )
         response = self.tokenizer.decode(response[0], skip_special_tokens=True)
 
-        response = response[len(prompt):]
+        response = response[len(prompt) :]
         if "," in response:
             response = response.split(",")[0]
         response = response.replace(" ", "").rstrip(".")
@@ -100,7 +91,7 @@ class TypeGenerator:
         )
         response = self.tokenizer.decode(response[0], skip_special_tokens=True)
 
-        response = response[len(prompt):]
+        response = response[len(prompt) :]
         if "," in response:
             response = response.split(",")[0]
         response = response.replace(" ", "")
@@ -124,12 +115,8 @@ class TypeGenerator:
         output = self.model.forward(input_tensor.to(self.model.device))
         logits = output.logits[0, -1]
 
-        true_token_id = (
-            self.tokenizer.encode("true", return_tensors="pt")[0, 0]
-        )
-        false_token_id = (
-            self.tokenizer.encode("false", return_tensors="pt")[0, 0]
-        )
+        true_token_id = self.tokenizer.encode("true", return_tensors="pt")[0, 0]
+        false_token_id = self.tokenizer.encode("false", return_tensors="pt")[0, 0]
 
         result = logits[true_token_id] > logits[false_token_id]
 
@@ -150,9 +137,7 @@ class TypeGenerator:
             num_return_sequences=1,
             temperature=self.temperature,
             stopping_criteria=[
-                StringStoppingCriteria(
-                    self.tokenizer, len(input_tokens[0]), maxLength
-                )
+                StringStoppingCriteria(self.tokenizer, len(input_tokens[0]), maxLength)
             ],
             pad_token_id=self.tokenizer.eos_token_id,
         )
@@ -161,7 +146,7 @@ class TypeGenerator:
             len(response[0]) >= len(input_tokens[0])
             and (response[0][: len(input_tokens[0])] == input_tokens).all()
         ):
-            response = response[0][len(input_tokens[0]):]
+            response = response[0][len(input_tokens[0]) :]
         if response.shape[0] == 1:
             response = response[0]
 

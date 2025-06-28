@@ -36,11 +36,12 @@ class Jsonformer:
         self.prompt = prompt
         self.output_format = output_format
         self.validate_output = validate_output
+        self.debug_on = debug
 
         self.type_generator = TypeGenerator(
             model=model,
             tokenizer=tokenizer,
-            debug=debug,
+            debug=self.debug,  # <-- THIS IS THE CHANGE
             max_number_tokens=max_number_tokens,
             max_string_token_length=max_string_token_length,
             temperature=temperature,
@@ -49,7 +50,6 @@ class Jsonformer:
         self.schema_validator = SchemaValidator() if validate_output else None
 
         self.generation_marker = "|GENERATION|"
-        self.debug_on = debug
         self.max_array_length = max_array_length
 
     def debug(self, caller: str, value: str, is_prompt: bool = False):
@@ -114,7 +114,7 @@ class Jsonformer:
 
     def choose_type_to_generate(self, possible_types: List[str]) -> str:
         possible_types = list(set(possible_types))  # remove duplicates
-        self.debug("[choose_type_to_generate]", possible_types)
+        self.debug("[choose_type_to_generate]", str(possible_types))
         if len(possible_types) < 1:
             raise ValueError("Union type must not be empty")
         elif len(possible_types) == 1:
@@ -133,7 +133,7 @@ class Jsonformer:
         max_logit = -float("inf")
         for possible_type in possible_types:
             try:
-                prefix_tokens = self.type_prefix_tokens[possible_type]
+                prefix_tokens = self.type_generator.type_prefix_tokens[possible_type]
             except KeyError:
                 raise ValueError(f"Unsupported schema type: {possible_type}")
             max_type_logit = logits[prefix_tokens].max()
