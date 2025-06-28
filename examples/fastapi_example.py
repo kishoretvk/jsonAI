@@ -45,7 +45,6 @@ async def generate_structured_data(request: GenerateRequest):
         print("Using default schema:", request.json_schema)
 
     try:
-        # FIX: Broke up the instantiation to prevent any long lines.
         jsonformer_instance = Jsonformer(
             model=model,
             tokenizer=tokenizer,

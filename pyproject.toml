@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "jsonAI"
-version = "0.12.2"
+version = "0.12.3"
 description = ""
 authors = ["1rgs <kishoretvk9@gmail.com>"]
 readme = "README.md"
@@ -31,7 +31,7 @@ fastapi = "^0.111.0"
 uvicorn = {extras = ["standard"], version = "^0.30.1"}
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core>=1.0.0"
 build-backend = "poetry.core.masonry.api"
 
 
