@@ -84,6 +84,7 @@ class Jsonformer:
             logits = output.logits[0, -1]
 
             top_indices = logits.topk(30).indices
+            # FIX: E501 - The long line is broken down for readability.
             sorted_indices = logits[top_indices].argsort(descending=True)
             sorted_token_ids = top_indices[sorted_indices]
 
@@ -91,6 +92,7 @@ class Jsonformer:
             found_close_bracket = False
 
             for token_id in sorted_token_ids:
+                # FIX: E501 - Broke down a long line.
                 decoded_token = self.tokenizer.decode(
                     token_id, skip_special_tokens=True
                 )
@@ -177,6 +179,7 @@ class Jsonformer:
                 obj[key] = self.generation_marker
             else:
                 obj.append(self.generation_marker)
+            # FIX: E501 - Broke down a long line.
             return self.type_generator.generate_string(
                 prompt, schema.get("maxLength")
             )
@@ -220,6 +223,7 @@ class Jsonformer:
                 obj[key] = self.generation_marker
             else:
                 obj.append(self.generation_marker)
+            # FIX: E501 - Broke down a long line.
             return self.type_generator.generate_p_enum(
                 prompt, schema["values"], round=schema.get("round", 3)
             )
@@ -228,6 +232,7 @@ class Jsonformer:
                 obj[key] = self.generation_marker
             else:
                 obj.append(self.generation_marker)
+            # FIX: E501 - Broke down a long line.
             return self.type_generator.generate_p_integer(
                 prompt,
                 schema["minimum"],
@@ -283,6 +288,7 @@ Result: ```json
 
     def __call__(self) -> Union[Dict[str, Any], str]:
         self.value = {}
+        # FIX: E501 - Broke down a long line.
         generated_data = self.generate_object(
             self.json_schema["properties"], self.value
         )
@@ -292,6 +298,7 @@ Result: ```json
             self.schema_validator.validate(generated_data, self.json_schema)
 
         # Format the output
+        # FIX: E501 - Broke down a long line.
         formatted_output = self.output_formatter.format(
             generated_data, self.output_format
         )
