@@ -75,4 +75,3 @@ async def generate_structured_data(request: GenerateRequest):
         print(f"An error occurred: {e}")
         # Return a JSON error response for consistency.
         return {"error": str(e)}
-
