@@ -51,23 +51,19 @@ async def generate_structured_data(request: GenerateRequest):
         )
         generated_data = jsonformer_instance()
 
-        # FastAPI automatically handles JSON response for dict/list
-        # For XML/YAML, return plain text response
+        # The refactored Jsonformer now returns the formatted output directly.
+        # FastAPI handles JSON (dict/list) automatically.
+        # For XML/YAML, we return PlainTextResponse with the correct media type.
         if request.output_format == "json":
-            return generated_data
+            return generated_data # generated_data is a dict for JSON
         else:
-            return PlainTextResponse(
-                content=generated_data,
-                media_type=(
-                    "application/xml"
-                    if request.output_format == "xml"
-                    else "application/yaml"
-                ),
-            )
+            media_type = "application/xml" if request.output_format == "xml" else "application/yaml"
+            return PlainTextResponse(content=generated_data, media_type=media_type) # generated_data is a string for XML/YAML
 
     except Exception as e:
         # Basic error handling
         print(f"An error occurred: {e}")  # Log the error
+        # Return a JSON error response even for non-JSON requests for consistency
         return {"error": str(e)}
 
 
