@@ -3,7 +3,7 @@ name: CD
 on:
   push:
     tags:
-      - 'v*' # Trigger on tags starting with v (e.g., v0.1.0)
+      - 'v*'
 
 jobs:
   publish:
@@ -29,7 +29,7 @@ jobs:
     - name: Publish to PyPI
       run: poetry publish --username __token__ --password ${{ secrets.PYPI_API_TOKEN }}
       env:
-        POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_API_TOKEN }} # Alternative way to pass token
+        POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_API_TOKEN }}
 
     - name: Create GitHub Release
       id: create_release
