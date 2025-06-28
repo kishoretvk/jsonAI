@@ -10,7 +10,6 @@ from jsonAI.logits_processors import (
 )
 from jsonAI.prob_choice_tree import prob_choice_tree, round_to_nsf
 from jsonAI.type_prefixes import get_prefix_tokens_for_types
-from termcolor import cprint
 
 
 class TypeGenerator:
@@ -54,7 +53,7 @@ class TypeGenerator:
         )
         response = self.tokenizer.decode(response[0], skip_special_tokens=True)
 
-        response = response[len(prompt) :]
+        response = response[len(prompt):]
         if "," in response:
             response = response.split(",")[0]
         response = response.replace(" ", "").rstrip(".")
@@ -91,7 +90,7 @@ class TypeGenerator:
         )
         response = self.tokenizer.decode(response[0], skip_special_tokens=True)
 
-        response = response[len(prompt) :]
+        response = response[len(prompt):]
         if "," in response:
             response = response.split(",")[0]
         response = response.replace(" ", "")
@@ -110,18 +109,19 @@ class TypeGenerator:
 
     def generate_boolean(self, prompt: str) -> bool:
         self.debug("[generate_boolean]", prompt, is_prompt=True)
-
         input_tensor = self.tokenizer.encode(prompt, return_tensors="pt")
         output = self.model.forward(input_tensor.to(self.model.device))
         logits = output.logits[0, -1]
 
-        true_token_id = self.tokenizer.encode("true", return_tensors="pt")[0, 0]
-        false_token_id = self.tokenizer.encode("false", return_tensors="pt")[0, 0]
+        true_token_id = self.tokenizer.encode(
+            "true", return_tensors="pt"
+        )[0, 0]
+        false_token_id = self.tokenizer.encode(
+            "false", return_tensors="pt"
+        )[0, 0]
 
         result = logits[true_token_id] > logits[false_token_id]
-
         self.debug("[generate_boolean]", result)
-
         return result.item()
 
     def generate_string(self, prompt: str, maxLength=None) -> str:
@@ -130,33 +130,29 @@ class TypeGenerator:
         input_tokens = self.tokenizer.encode(prompt, return_tensors="pt").to(
             self.model.device
         )
-
         response = self.model.generate(
             input_tokens,
             max_new_tokens=self.max_string_token_length,
             num_return_sequences=1,
             temperature=self.temperature,
             stopping_criteria=[
-                StringStoppingCriteria(self.tokenizer, len(input_tokens[0]), maxLength)
+                StringStoppingCriteria(
+                    self.tokenizer, len(input_tokens[0]), maxLength
+                )
             ],
             pad_token_id=self.tokenizer.eos_token_id,
         )
-
         if (
             len(response[0]) >= len(input_tokens[0])
-            and (response[0][: len(input_tokens[0])] == input_tokens).all()
+            and (response[0][:len(input_tokens[0])] == input_tokens).all()
         ):
-            response = response[0][len(input_tokens[0]) :]
+            response = response[0][len(input_tokens[0]):]
         if response.shape[0] == 1:
             response = response[0]
-
         response = self.tokenizer.decode(response, skip_special_tokens=True)
-
         self.debug("[generate_string]", "|" + response + "|")
-
         if response.count('"') < 1:
             return response
-
         return response.split('"')[0].strip()
 
     def generate_p_enum(self, prompt: str, values: list, round: int) -> str:
@@ -167,7 +163,6 @@ class TypeGenerator:
         )[0]
         values_tokens = self.tokenizer(values).input_ids
         values_tokens = [torch.tensor(c) for c in values_tokens]
-
         r = list(
             prob_choice_tree(
                 self.model,
@@ -184,10 +179,9 @@ class TypeGenerator:
     ) -> float:
         values = [str(n) for n in range(int(range_min), int(range_max) + 1)]
         result = self.generate_p_enum(prompt, values, round=round)
-
         total = 0.0
         for r in result:
             total += float(r["choice"]) * r["prob"]
-
         if round is not None:
             total = round_to_nsf(total, round)
+        return total
