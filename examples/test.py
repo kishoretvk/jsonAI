@@ -175,6 +175,10 @@ except Exception as e:
 
 # --- Instructions ---
 print("\n--- Instructions ---")
-print(f"To run this test file, make sure you have the '{MODEL_NAME}' model accessible")
+# FIX: E501 - Broke long print statement into multiple lines
+print(
+    f"To run this test file, make sure you have the '{MODEL_NAME}' model "
+    "accessible"
+)
 print("and the project dependencies installed (`poetry install`).")
 print("Then run: poetry run python test.py")
