@@ -7,7 +7,7 @@ class StringStoppingCriteria(StoppingCriteria):
         self,
         tokenizer: PreTrainedTokenizer,
         prompt_length: int,
-        max_length: int = None
+        max_length: int=None
     ):
         self.tokenizer = tokenizer
         self.prompt_length = prompt_length
@@ -72,7 +72,9 @@ class NumberStoppingCriteria(StoppingCriteria):
         if (
             len(decoded) > 1
             and "," in decoded
-            and any(c.isdigit() for c in decoded.split(",")[0])
+            and any(
+                c.isdigit() for c in decoded.split(",")[0]
+            )
         ):
             return True
 
@@ -99,7 +101,10 @@ class OutputNumbersTokens(LogitsWarper):
             if (
                 token_str == ""
                 or (
-                    all(c.isdigit() or c == "." for c in token_str)
+                    all(
+                        c.isdigit() or c == "."
+                        for c in token_str
+                    )
                     and token_str.count(".") <= 1
                 )
                 or (

@@ -51,7 +51,9 @@ def is_binary_prefix(s: str) -> bool:
     return re.match(r'^[A-Za-z0-9+/]+={0,2}$', s)
 
 
-def get_prefix_tokens_for_types(tokenizer: PreTrainedTokenizer) -> Dict[str, List[str]]:
+def get_prefix_tokens_for_types(
+    tokenizer: PreTrainedTokenizer
+) -> Dict[str, List[str]]:
     vocab = tokenizer.vocab.items()
     return {
         "number": [
