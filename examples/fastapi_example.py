@@ -63,9 +63,9 @@ async def generate_structured_data(request: GenerateRequest):
             media_type = (
                 "application/xml" if request.output_format == "xml" else "application/yaml"
             )
-            # FIX: E501 - The long line is broken down for readability.
             return PlainTextResponse(
-                content=generated_data, media_type=media_type
+                content=generated_data,
+                media_type=media_type
             )
 
     except Exception as e:
