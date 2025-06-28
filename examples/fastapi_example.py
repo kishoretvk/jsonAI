@@ -64,6 +64,7 @@ async def generate_structured_data(request: GenerateRequest):
                 media_type = "application/xml"
             else:
                 media_type = "application/yaml"
+            # FIX: E501 - Broke long function call into multiple lines
             return PlainTextResponse(
                 content=generated_data, media_type=media_type
             )
@@ -75,34 +76,3 @@ async def generate_structured_data(request: GenerateRequest):
         # Return a JSON error response for consistency.
         return {"error": str(e)}
 
-
-# Instructions on how to run the example
-"""
-To run this example:
-
-1. Make sure you have jsonAI and necessary dependencies installed:
-   pip install jsonformer fastapi uvicorn transformers torch jsonschema PyYAML
-
-2. Save this code as fastapi_example.py
-
-3. Run the server from your terminal in the same directory:
-   uvicorn fastapi_example:app --reload
-
-4. Open your browser or a tool like curl/Postman and send a POST request.
-   The target URL is http://127.0.0.1:8000/generate/
-   
-   Example JSON body:
-   ```json
-   {
-       "prompt": "Generate a simple object",
-       "json_schema": {
-           "type": "object",
-           "properties": {
-               "name": {"type": "string"},
-               "age": {"type": "integer"}
-           }
-       },
-       "output_format": "json",  // or "xml", "yaml"
-       "validate_output": true   // or false
-   }
-"""
