@@ -2,7 +2,18 @@
 
 jsonAI is a Python library for generating JSON objects based on a given schema using a pre-trained language model. It supports a wide range of data types, including numbers, integers, booleans, strings, datetime, date, time, UUID, and binary data.
 
-The idea to create json structures with strong typed schemas is now possible, with any numbe rof variable combinations. 
+The idea to create json structures with strong typed schemas is now possible, with any number of variable combinations.
+
+## Architecture Overview
+
+The `jsonAI` library is structured into several key components to provide robust and flexible structured data generation:
+
+-   **`Jsonformer` (in `jsonAI/main.py`)**: The main facade class that orchestrates the generation process. It takes the model, tokenizer, schema, and prompt, and coordinates the use of other components to produce the final output. It also handles output formatting and validation.
+-   **`TypeGenerator` (in `jsonAI/type_generator.py`)**: Responsible for generating values for individual data types based on the schema and the current generation context (prompt).
+-   **`OutputFormatter` (in `jsonAI/output_formatter.py`)**: Handles the conversion of the generated data structure (internal dictionary representation) into the desired output format (JSON, XML, YAML).
+-   **`SchemaValidator` (in `jsonAI/schema_validator.py`)**: Provides functionality to validate the generated data structure against the provided JSON schema using the `jsonschema` library.
+
+This modular architecture improves separation of concerns and makes the library more maintainable and extensible.
 
 This currently supports a subset of JSON Schema. Below is a list of the supported schema types:
 
@@ -211,50 +222,21 @@ jsonformer = Jsonformer(
     tokenizer=tokenizer,
     json_schema=json_schema,
     prompt=prompt,
-    debug=True
+    debug=True,
+    output_format="json", # Specify output format (e.g., "json", "xml", "yaml")
+    validate_output=False # Enable/disable validation (requires jsonschema)
 )
 
 # Generate the data
 generated_data = jsonformer()
 print(generated_data)
-highlight_values(generated_data)
+# The highlight_values utility might be useful for debugging JSON output
+# from jsonAI.format import highlight_values
+# highlight_values(generated_data)
 
 ```
 
-## generated Output 
-
-``` json
-{
-  transaction_id: "035a6195-5536-4272-966b-ba700c6de39c",
-  store: {
-    name: "Starbucks",
-    location: "San Francisco",
-    datetime: "2024-09-21T19:47:28.164729"
-  },
-  customer: {
-    customer_id: "b8a61099-4baf-4352-af86-922f476f2bfc",
-    name: "John Doe",
-    membership: True
-  },
-  items: [
-    {
-      item_id: "f60a82b6-b7e8-4a85-a202-fc6aa28e1de8",
-      name: "Coffee",
-      category: "Drip Brew",
-      price: 10.0,
-      quantity: 10000000
-    }
-  ],
-  total_amount: 2024092119.0,
-  payment_method: "card",
-  transaction_date: "2024-09-21",
-  transaction_time: "19:47:30.686584",
-  receipt_binary: "ZXhhbXBsZSBiaW5hcnkgZGF0YQ=="
-}
-
-```
-
-## Example 
+## Example with various types
 
 ```python
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -276,20 +258,71 @@ json_schema = {
         "binary": {"type": "binary"},
     }
 }
-prompt = "Generate a JSON object"
+prompt = "Generate a JSON object with various data types"
 
 jsonformer = Jsonformer(
     model=model,
     tokenizer=tokenizer,
     json_schema=json_schema,
     prompt=prompt,
-    debug=True
+    debug=True,
+    output_format="json", # Specify output format
+    validate_output=False # Enable/disable validation
 )
 
 generated_data = jsonformer()
 print(generated_data)
 
+```
 
+## Probabilistic Generation
+
+`jsonAI` includes features for probabilistic structured generation, allowing you to extract probability distributions or weighted means for certain types.
+
+### Supported Probabilistic Types:
+
+-   `p_enum`: Returns a list of possible values and their probabilities for an enumeration.
+-   `p_integer`: Returns the probabilistic weighted mean for an integer range.
+
+### Example:
+
+```python
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from jsonAI.main import Jsonformer
+
+model_name = "databricks/dolly-v2-3b" # Note: Probabilistic features may work better with larger models
+model = AutoModelForCausalLM.from_pretrained(model_name)
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+json_schema = {
+    "type": "object",
+    "properties": {
+        # Get probability distribution for age within a range
+        "age_probs": {"type": "p_enum", "values": [str(s) for s in range(10, 20)]},
+        # Get probabilistic weighted mean for age within a range
+        "age_wmean": {"type": "p_integer", "minimum": 10, "maximum": 20},
+        # Get probability distribution for a boolean choice
+        "is_student_probs": {"type": "p_enum", "values": ["true", "false"]},
+        # Standard boolean generation
+        "is_student": {"type": "boolean"},
+        # Standard types also supported alongside probabilistic ones
+        "name": {"type": "string", "maxLength": 4},
+        "age": {"type": "integer"},
+        "unit_time": {"type": "number"},
+        "courses": {"type": "array", "items": {"type": "string"}},
+        "trim": {"type": ["string", "null"]},
+        "color": {
+            "type": "enum",
+            "values": ["red", "green", "blue", "brown", "white", "black"],
+        },
+    },
+}
+
+prompt = "Generate a young person's information based on the following schema:"
+jsonformer = Jsonformer(model, tokenizer, json_schema, prompt, temperature=0)
+generated_data = jsonformer()
+
+print(generated_data)
 ```
 
 ## Development
