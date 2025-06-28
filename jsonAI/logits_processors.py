@@ -31,9 +31,7 @@ class StringStoppingCriteria(StoppingCriteria):
         if self.max_length is not None:
             # Due to token handling, max_length check may not be accurate
             # Could exceed by up to 10 characters
-            # FIX: E203 whitespace before ':'
             gen_ids = input_ids[0][self.prompt_length:]
-            # FIX: E501 line too long
             o = self.tokenizer.decode(gen_ids, skip_special_tokens=True)
             str_l = len(o)
             if str_l > self.max_length:
@@ -89,14 +87,12 @@ class NumberStoppingCriteria(StoppingCriteria):
 
 
 class OutputNumbersTokens(LogitsWarper):
-    # FIX: Removed unused 'prompt' parameter which would cause a TypeError
     def __init__(self, tokenizer: PreTrainedTokenizer):
         self.tokenizer = tokenizer
         vocab_size = len(tokenizer)
         self.allowed_mask = torch.zeros(vocab_size, dtype=torch.bool)
 
         for _, token_id in tokenizer.get_vocab().items():
-            # FIX: E501 line too long
             token_str = self.tokenizer.decode(
                 token_id, skip_special_tokens=True
             ).strip()
@@ -109,7 +105,6 @@ class OutputNumbersTokens(LogitsWarper):
                 )
                 or (
                     "," in token_str
-                    # FIX: E501 line too long
                     and all(
                         c.isdigit() or c == "."
                         for c in token_str.split(",")[0]
@@ -167,14 +162,12 @@ class IntegerStoppingCriteria(StoppingCriteria):
 
 
 class OutputIntegersTokens(LogitsWarper):
-    # FIX: Removed unused 'prompt' parameter which would cause a TypeError
     def __init__(self, tokenizer: PreTrainedTokenizer):
         self.tokenizer = tokenizer
         vocab_size = len(tokenizer)
         self.allowed_mask = torch.zeros(vocab_size, dtype=torch.bool)
 
         for _, token_id in tokenizer.get_vocab().items():
-            # FIX: E501 line too long
             token_str = self.tokenizer.decode(
                 token_id, skip_special_tokens=True
             ).strip()
@@ -184,7 +177,6 @@ class OutputIntegersTokens(LogitsWarper):
                 or all(c.isdigit() for c in token_str)
                 or (
                     "," in token_str
-                    # FIX: E501 line too long
                     and all(c.isdigit() for c in token_str.split(",")[0])
                 )
             ):
@@ -195,3 +187,5 @@ class OutputIntegersTokens(LogitsWarper):
         scores[~mask] = -float("inf")
 
         return scores
+
+# FIX: W292 - Added a newline at the end of the file.
