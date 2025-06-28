@@ -64,7 +64,6 @@ async def generate_structured_data(request: GenerateRequest):
                 media_type = "application/xml"
             else:
                 media_type = "application/yaml"
-            # FIX: E501 - Broke long function call into multiple lines
             return PlainTextResponse(
                 content=generated_data, media_type=media_type
             )
