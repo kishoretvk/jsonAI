@@ -47,7 +47,7 @@ async def generate_structured_data(request: GenerateRequest):
             json_schema=request.json_schema,
             prompt=request.prompt,
             output_format=request.output_format,
-            validate_output=request.validate_output
+            validate_output=request.validate_output,
         )
         generated_data = jsonformer_instance()
 
