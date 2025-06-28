@@ -278,7 +278,7 @@ Result: ```json
         else:
             raise ValueError("Failed to find generation marker")
 
-        prompt = template.format(
+        prompt ascend = template.format(
             prompt=self.prompt,
             schema=json.dumps(self.json_schema),
             progress=progress,
