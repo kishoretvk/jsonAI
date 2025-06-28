@@ -1,16 +1,16 @@
-from typing import List, Set, Union, Dict, Any
-import xml.etree.ElementTree as ET  # For XML
-import yaml  # For YAML
-from jsonschema import validate, ValidationError  # For validation
-from jsonAI.type_generator import TypeGenerator
-from jsonAI.output_formatter import OutputFormatter
-from jsonAI.schema_validator import SchemaValidator
+from typing import List, Union, Dict, Any
 
 from termcolor import cprint
 from transformers import PreTrainedModel, PreTrainedTokenizer
 import json
 
+from jsonAI.type_generator import TypeGenerator
+from jsonAI.output_formatter import OutputFormatter
+from jsonAI.schema_validator import SchemaValidator
+
+
 GENERATION_MARKER = "|GENERATION|"
+
 
 class Jsonformer:
     value: Dict[str, Any] = {}
@@ -43,7 +43,7 @@ class Jsonformer:
             debug=debug,
             max_number_tokens=max_number_tokens,
             max_string_token_length=max_string_token_length,
-            temperature=temperature
+            temperature=temperature,
         )
         self.output_formatter = OutputFormatter()
         self.schema_validator = SchemaValidator() if validate_output else None
@@ -79,9 +79,7 @@ class Jsonformer:
             obj.append(self.generation_marker)
             input_prompt = self.get_prompt()
             obj.pop()
-            input_tensor = self.tokenizer.encode(
-                input_prompt, return_tensors="pt"
-            )
+            input_tensor = self.tokenizer.encode(input_prompt, return_tensors="pt")
             output = self.model.forward(input_tensor.to(self.model.device))
             logits = output.logits[0, -1]
 
@@ -180,9 +178,7 @@ class Jsonformer:
                 obj[key] = self.generation_marker
             else:
                 obj.append(self.generation_marker)
-            return self.type_generator.generate_string(
-                prompt, schema.get("maxLength")
-            )
+            return self.type_generator.generate_string(prompt, schema.get("maxLength"))
         elif schema_type == "datetime":
             if key:
                 obj[key] = self.generation_marker
@@ -281,15 +277,15 @@ Result: ```json
 
     def __call__(self) -> Union[Dict[str, Any], str]:
         self.value = {}
-        generated_data = self.generate_object(
-            self.json_schema["properties"], self.value
-        )
+        generated_data = self.generate_object(self.json_schema["properties"], self.value)
 
         # Validate if enabled
         if self.validate_output and self.schema_validator:
             self.schema_validator.validate(generated_data, self.json_schema)
 
         # Format the output
-        formatted_output = self.output_formatter.format(generated_data, self.output_format)
+        formatted_output = self.output_formatter.format(
+            generated_data, self.output_format
+        )
 
         return formatted_output
