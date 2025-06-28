@@ -5,9 +5,9 @@ description = ""
 authors = ["1rgs <kishoretvk9@gmail.com>"]
 readme = "README.md"
 
-[[tool.poetry.packages]] # Added explicit package definition
+[[tool.poetry.packages]]
 from = "."
-include = "jsonAI" # Specifies that the package "jsonAI" is found in the current directory "."
+include = "jsonAI"
 
 [tool.poetry.dependencies]
 python = "^3.9,<4.0"
@@ -25,16 +25,32 @@ accelerate = "^0.18.0"
 bitsandbytes = "^0.38.1"
 transformers = "^4.27.4"
 pytest = "^8.2.2"
-pytest-cov = "^5.0.0" # Added for code coverage
+pytest-cov = "^5.0.0"
 flake8 = "^7.1.0"
 fastapi = "^0.111.0"
 uvicorn = {extras = ["standard"], version = "^0.30.1"}
+black = "^24.8.0" # Added for auto-formatting
+pre-commit = "^3.8.0" # Added for pre-commit hooks
 
 [build-system]
-requires = ["poetry-core>=1.0.0"] # FIX: Added the missing closing bracket here
+requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
-
 
 [virtualenvs]
 create = true
 in-project = true
+
+[tool.black]
+line-length = 79 # Matches PEP 8 for E501 compliance
+target-version = ['py39'] # Matches python = "^3.9,<4.0"
+
+[tool.flake8]
+max-line-length = 79 # Matches PEP 8 for E501 compliance
+extend-ignore = "E203" # Ignore Black's conflict with PEP 8 on slicing
+per-file-ignores = """
+    # Ignore W292 in test files if needed
+    tests/*:W292
+"""
+
+[tool.pytest]
+addopts = "--cov=jsonAI --cov-report=html"

@@ -79,13 +79,18 @@ class Jsonformer:
             obj.append(self.generation_marker)
             input_prompt = self.get_prompt()
             obj.pop()
-            input_tensor = self.tokenizer.encode(input_prompt, return_tensors="pt")
-            output = self.model.forward(input_tensor.to(self.model.device))
+            input_tensor = self.tokenizer.encode(
+                input_prompt, return_tensors="pt"
+            )
+            output = self.model.forward(
+                input_tensor.to(self.model.device)
+            )
             logits = output.logits[0, -1]
 
             top_indices = logits.topk(30).indices
-            # FIX: E501 - The long line is broken down for readability.
-            sorted_indices = logits[top_indices].argsort(descending=True)
+            sorted_indices = logits[top_indices].argsort(
+                descending=True
+            )
             sorted_token_ids = top_indices[sorted_indices]
 
             found_comma = False
@@ -116,8 +121,12 @@ class Jsonformer:
             return possible_types[0]
 
         prompt = self.get_prompt()
-        input_tensor = self.tokenizer.encode(prompt, return_tensors="pt")
-        output = self.model.forward(input_tensor.to(self.model.device))
+        input_tensor = self.tokenizer.encode(
+            prompt, return_tensors="pt"
+        )
+        output = self.model.forward(
+            input_tensor.to(self.model.device)
+        )
         logits = output.logits[0, -1]
 
         max_type = None
