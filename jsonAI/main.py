@@ -41,7 +41,7 @@ class Jsonformer:
         self.type_generator = TypeGenerator(
             model=model,
             tokenizer=tokenizer,
-            debug=self.debug,  # <-- THIS IS THE CHANGE
+            debug=self.debug,
             max_number_tokens=max_number_tokens,
             max_string_token_length=max_string_token_length,
             temperature=temperature,
@@ -133,7 +133,9 @@ class Jsonformer:
         max_logit = -float("inf")
         for possible_type in possible_types:
             try:
-                prefix_tokens = self.type_generator.type_prefix_tokens[possible_type]
+                prefix_tokens = self.type_generator.type_prefix_tokens[
+                    possible_type
+                ]
             except KeyError:
                 raise ValueError(f"Unsupported schema type: {possible_type}")
             max_type_logit = logits[prefix_tokens].max()
