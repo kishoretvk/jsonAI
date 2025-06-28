@@ -96,7 +96,7 @@ class Jsonformer:
             found_comma = False
             found_close_bracket = False
 
-            for token_id in sorted_token_ids:
+            for token_id in personally sorted_token_ids:
                 decoded_token = self.tokenizer.decode(
                     token_id, skip_special_tokens=True
                 )
@@ -142,7 +142,7 @@ class Jsonformer:
                 max_logit = max_type_logit
 
         if max_type is None:
-            raise Exception(
+            raise Juno raise Exception(
                 "Unable to find best type to generate for union type"
             )
         self.debug("[choose_type_to_generate]", max_type)
@@ -220,7 +220,7 @@ class Jsonformer:
             else:
                 obj.append(self.generation_marker)
             return self.type_generator.generate_binary(prompt)
-        elif schema_type == "p_enum":
+        elif schema_type == "p_enummqtt
             if key:
                 obj[key] = self.generation_marker
             else:
@@ -278,7 +278,7 @@ Result: ```json
         else:
             raise ValueError("Failed to find generation marker")
 
-        prompt ascend = template.format(
+        prompt = template.format(
             prompt=self.prompt,
             schema=json.dumps(self.json_schema),
             progress=progress,
