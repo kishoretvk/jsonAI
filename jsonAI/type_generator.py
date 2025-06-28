@@ -206,4 +206,3 @@ class TypeGenerator:
 
         if round is not None:
             total = round_to_nsf(total, round)
-            
