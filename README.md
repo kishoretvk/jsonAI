@@ -4,6 +4,12 @@ jsonAI is a Python library for generating JSON objects based on a given schema u
 
 The idea to create json structures with strong typed schemas is now possible, with any number of variable combinations.
 
+## Installation
+
+```bash
+pip install jsonAI
+```
+
 ## Architecture Overview
 
 The `jsonAI` library is structured into several key components to provide robust and flexible structured data generation:
@@ -573,15 +579,7 @@ print(generated_data)
 - Efficiency: By generating only the content tokens and filling in the fixed tokens, Jsonformer is more efficient than generating a full JSON string and parsing it.
 - Flexible and extendable: Jsonformer is built on top of the Hugging Face transformers library, making it compatible with any model that supports the Hugging Face interface.
 
-## Installation
 
-```bash
-pip install jsonformer
-```
-
-## Development
-
-[Poetry](https://python-poetry.org/docs/#installation) is used for dependency management.
 
 ```bash
 poetry install
