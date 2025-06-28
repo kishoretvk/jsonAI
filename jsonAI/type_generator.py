@@ -63,7 +63,6 @@ class TypeGenerator:
         )
         response = self.tokenizer.decode(response[0], skip_special_tokens=True)
 
-        # FIX: E203 whitespace before ':'
         response = response[len(prompt):]
         if "," in response:
             response = response.split(",")[0]
@@ -75,7 +74,6 @@ class TypeGenerator:
             if iterations > 3:
                 raise ValueError("Failed to generate a valid number")
 
-            # FIX: E501 line too long
             return self.generate_number(
                 prompt,
                 temperature=self.temperature * 1.3,
@@ -102,7 +100,6 @@ class TypeGenerator:
         )
         response = self.tokenizer.decode(response[0], skip_special_tokens=True)
 
-        # FIX: E203 whitespace before ':'
         response = response[len(prompt):]
         if "," in response:
             response = response.split(",")[0]
@@ -114,7 +111,6 @@ class TypeGenerator:
             if iterations > 3:
                 raise ValueError("Failed to generate a valid integer")
 
-            # FIX: E501 line too long and logical bug in recursion
             return self.generate_integer(
                 prompt,
                 temperature=self.temperature * 1.3,
@@ -128,11 +124,9 @@ class TypeGenerator:
         output = self.model.forward(input_tensor.to(self.model.device))
         logits = output.logits[0, -1]
 
-        # FIX: E501 line too long
         true_token_id = (
             self.tokenizer.encode("true", return_tensors="pt")[0, 0]
         )
-        # FIX: E501 line too long
         false_token_id = (
             self.tokenizer.encode("false", return_tensors="pt")[0, 0]
         )
@@ -155,7 +149,6 @@ class TypeGenerator:
             max_new_tokens=self.max_string_token_length,
             num_return_sequences=1,
             temperature=self.temperature,
-            # FIX: E501 line too long
             stopping_criteria=[
                 StringStoppingCriteria(
                     self.tokenizer, len(input_tokens[0]), maxLength
@@ -168,7 +161,6 @@ class TypeGenerator:
             len(response[0]) >= len(input_tokens[0])
             and (response[0][: len(input_tokens[0])] == input_tokens).all()
         ):
-            # FIX: E203 whitespace before ':'
             response = response[0][len(input_tokens[0]):]
         if response.shape[0] == 1:
             response = response[0]
@@ -191,7 +183,6 @@ class TypeGenerator:
         values_tokens = self.tokenizer(values).input_ids
         values_tokens = [torch.tensor(c) for c in values_tokens]
 
-        # FIX: E501 line too long
         r = list(
             prob_choice_tree(
                 self.model,

@@ -22,14 +22,15 @@ class GenerateRequest(BaseModel):
     prompt: str
     json_schema: Optional[Dict[str, Any]] = None
     output_format: Optional[str] = "json"
-    # Output type (json, xml, yaml)
+    # Output type can be json, xml, or yaml
     validate_output: Optional[bool] = False  # Validate output
 
 
 @app.post("/generate/")
 async def generate_structured_data(request: GenerateRequest):
     """
-    Generates structured data (JSON, XML, or YAML) based on a prompt and schema.
+    Generates structured data based on a prompt and schema.
+    Supported formats: JSON, XML, YAML.
     """
     # Define a default schema if none is provided
     if request.json_schema is None:
@@ -54,21 +55,24 @@ async def generate_structured_data(request: GenerateRequest):
         )
         generated_data = jsonformer_instance()
 
-        # The refactored Jsonformer now returns the formatted output directly.
         # FastAPI handles JSON (dict/list) automatically.
-        # For XML/YAML, we return PlainTextResponse with the correct media type.
         if request.output_format == "json":
-            return generated_data  # generated_data is a dict for JSON
+            return generated_data
         else:
-            media_type = ("application/xml" if request.output_format == "xml" else "application/yaml")
-            return PlainTextResponse(content=generated_data, media_type=media_type)
-            # generated_data is a string for XML/YAML
+            # For XML/YAML, return PlainTextResponse with the correct media type.
+            if request.output_format == "xml":
+                media_type = "application/xml"
+            else:
+                media_type = "application/yaml"
+            return PlainTextResponse(
+                content=generated_data, media_type=media_type
+            )
 
     except Exception as e:
         # Basic error handling
         # Log the error
         print(f"An error occurred: {e}")
-        # Return a JSON error response even for non-JSON requests for consistency
+        # Return a JSON error response for consistency.
         return {"error": str(e)}
 
 
@@ -77,21 +81,17 @@ async def generate_structured_data(request: GenerateRequest):
 To run this example:
 
 1. Make sure you have jsonAI and necessary dependencies installed:
-   pip install jsonformer
-   fastapi
-   uvicorn
-   transformers
-   torch
-   jsonschema
-   PyYAML
+   pip install jsonformer fastapi uvicorn transformers torch jsonschema PyYAML
 
 2. Save this code as fastapi_example.py
 
 3. Run the server from your terminal in the same directory:
    uvicorn fastapi_example:app --reload
 
-4. Open your browser or a tool like curl/Postman and send a POST request to http://127.0.0.1:8000/generate/
-   with a JSON body like:
+4. Open your browser or a tool like curl/Postman and send a POST request.
+   The target URL is http://127.0.0.1:8000/generate/
+   
+   Example JSON body:
    ```json
    {
        "prompt": "Generate a simple object",
@@ -105,58 +105,4 @@ To run this example:
        "output_format": "json",  // or "xml", "yaml"
        "validate_output": true   // or false
    }
-   ```
-
-   Example using default schema:
-   ```json
-   {
-       "prompt": "Generate a simple object"
-   }
-   ```
-
-   Example requesting XML output:
-   ```json
-   {
-       "prompt": "Generate a simple object with a name and age",
-       "json_schema": {
-           "type": "object",
-           "properties": {
-               "name": {"type": "string"},
-               "age": {"type": "integer"}
-           }
-       },
-       "output_format": "xml"
-   }
-   ```
-
-   Example requesting YAML output:
-   ```json
-   {
-       "prompt": "Generate a simple object with a name and age",
-       "json_schema": {
-           "type": "object",
-           "properties": {
-               "name": {"type": "string"},
-               "age": {"type": "integer"}
-           }
-       },
-       "output_format": "yaml"
-   }
-   ```
-
-   Example with validation enabled:
-   ```json
-   {
-       "prompt": "Generate a simple object with a name and age",
-       "json_schema": {
-           "type": "object",
-           "properties": {
-               "name": {"type": "string"},
-               "age": {"type": "integer"}
-           },
-           "required": ["name", "age"]
-       },
-       "validate_output": true
-   }
-   ```
 """

@@ -84,9 +84,9 @@ class Jsonformer:
             logits = output.logits[0, -1]
 
             top_indices = logits.topk(30).indices
-            sorted_token_ids = top_indices[
-                logits[top_indices].argsort(descending=True)
-            ]
+            # FIX: E501 - Broke down a long, complex line
+            sorted_indices = logits[top_indices].argsort(descending=True)
+            sorted_token_ids = top_indices[sorted_indices]
 
             found_comma = False
             found_close_bracket = False
@@ -178,41 +178,49 @@ class Jsonformer:
                 obj[key] = self.generation_marker
             else:
                 obj.append(self.generation_marker)
-            return self.type_generator.generate_string(prompt, schema.get("maxLength"))
+            # FIX: E501 - Broke long function call into multiple lines
+            return self.type_generator.generate_string(
+                prompt, schema.get("maxLength")
+            )
         elif schema_type == "datetime":
             if key:
                 obj[key] = self.generation_marker
             else:
                 obj.append(self.generation_marker)
-            # Note: Currently hardcoded in TypeGenerator, needs model-based implementation
+            # FIX: E501 - Shortened comment to fit within line limit
+            # Note: A placeholder implementation in TypeGenerator.
             return self.type_generator.generate_datetime(prompt)
         elif schema_type == "date":
             if key:
                 obj[key] = self.generation_marker
             else:
                 obj.append(self.generation_marker)
-            # Note: Currently hardcoded in TypeGenerator, needs model-based implementation
+            # FIX: E501 - Shortened comment to fit within line limit
+            # Note: A placeholder implementation in TypeGenerator.
             return self.type_generator.generate_date(prompt)
         elif schema_type == "time":
             if key:
                 obj[key] = self.generation_marker
             else:
                 obj.append(self.generation_marker)
-            # Note: Currently hardcoded in TypeGenerator, needs model-based implementation
+            # FIX: E501 - Shortened comment to fit within line limit
+            # Note: A placeholder implementation in TypeGenerator.
             return self.type_generator.generate_time(prompt)
         elif schema_type == "uuid":
             if key:
                 obj[key] = self.generation_marker
             else:
                 obj.append(self.generation_marker)
-            # Note: Currently hardcoded in TypeGenerator, needs model-based implementation
+            # FIX: E501 - Shortened comment to fit within line limit
+            # Note: A placeholder implementation in TypeGenerator.
             return self.type_generator.generate_uuid(prompt)
         elif schema_type == "binary":
             if key:
                 obj[key] = self.generation_marker
             else:
                 obj.append(self.generation_marker)
-            # Note: Currently hardcoded in TypeGenerator, needs model-based implementation
+            # FIX: E501 - Shortened comment to fit within line limit
+            # Note: A placeholder implementation in TypeGenerator.
             return self.type_generator.generate_binary(prompt)
         elif schema_type == "p_enum":
             if key:
@@ -227,15 +235,22 @@ class Jsonformer:
                 obj[key] = self.generation_marker
             else:
                 obj.append(self.generation_marker)
+            # FIX: E501 - Broke long function call into multiple lines
             return self.type_generator.generate_p_integer(
-                prompt, schema["minimum"], schema["maximum"], round=schema.get("round", 3)
+                prompt,
+                schema["minimum"],
+                schema["maximum"],
+                round=schema.get("round", 3),
             )
         elif schema_type == "enum":
             if key:
                 obj[key] = self.generation_marker
             else:
                 obj.append(self.generation_marker)
-            return self.type_generator.generate_enum(prompt, set(schema["values"]))
+            # FIX: E501 - Broke long function call into multiple lines
+            return self.type_generator.generate_enum(
+                prompt, set(schema["values"])
+            )
         elif schema_type == "array":
             new_array = []
             obj[key] = new_array
@@ -277,7 +292,10 @@ Result: ```json
 
     def __call__(self) -> Union[Dict[str, Any], str]:
         self.value = {}
-        generated_data = self.generate_object(self.json_schema["properties"], self.value)
+        # FIX: E501 - Broke long function call into multiple lines
+        generated_data = self.generate_object(
+            self.json_schema["properties"], self.value
+        )
 
         # Validate if enabled
         if self.validate_output and self.schema_validator:
