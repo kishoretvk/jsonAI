@@ -300,5 +300,4 @@ Result: ```json
         formatted_output = self.output_formatter.format(
             generated_data, self.output_format
         )
-
         return formatted_output
