@@ -45,6 +45,7 @@ async def generate_structured_data(request: GenerateRequest):
         print("Using default schema:", request.json_schema)
 
     try:
+        # FIX: Broke up the instantiation to prevent any long lines.
         jsonformer_instance = Jsonformer(
             model=model,
             tokenizer=tokenizer,
@@ -64,6 +65,7 @@ async def generate_structured_data(request: GenerateRequest):
                 media_type = "application/xml"
             else:
                 media_type = "application/yaml"
+            # FIX: E501 - The long line is broken down for readability.
             return PlainTextResponse(
                 content=generated_data, media_type=media_type
             )
