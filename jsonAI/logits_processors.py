@@ -89,7 +89,9 @@ class OutputNumbersTokens(LogitsWarper):
         self.tokenizer = tokenizer
         self.tokenized_prompt = tokenizer(prompt, return_tensors="pt")
         vocab_size = len(tokenizer)
-        self.allowed_mask = torch.zeros(vocab_size, dtype=torch.bool)
+        self.allowed_mask = torch.zeros(
+            vocab_size, dtype=torch.bool
+        )
 
         for _, token_id in tokenizer.get_vocab().items():
             token_str = self.tokenizer.decode(token_id, skip_special_tokens=True).strip()
@@ -97,18 +99,12 @@ class OutputNumbersTokens(LogitsWarper):
             if (
                 token_str == ""
                 or (
-                    all(
-                        c.isdigit() or c == "."
-                        for c in token_str
-                    )
+                    all(c.isdigit() or c == "." for c in token_str)
                     and token_str.count(".") <= 1
                 )
                 or (
                     "," in token_str
-                    and all(
-                        c.isdigit() or c == "."
-                        for c in token_str.split(",")[0]
-                    )
+                    and all(c.isdigit() or c == "." for c in token_str.split(",")[0])
                     and token_str.count(".") <= 1
                 )
             ):
@@ -147,9 +143,7 @@ class IntegerStoppingCriteria(StoppingCriteria):
         if (
             len(decoded) > 1
             and "," in decoded
-            and any(
-                c.isdigit() for c in decoded.split(",")[0]
-            )
+            and any(c.isdigit() for c in decoded.split(",")[0])
         ):
             return True
 
@@ -178,9 +172,7 @@ class OutputIntegersTokens(LogitsWarper):
                 or all(c.isdigit() for c in token_str)
                 or (
                     "," in token_str
-                    and all(
-                        c.isdigit() for c in token_str.split(",")[0]
-                    )
+                    and all(c.isdigit() for c in token_str.split(",")[0])
                 )
             ):
                 self.allowed_mask[token_id] = True

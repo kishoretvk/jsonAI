@@ -1,5 +1,6 @@
 from jsonschema import validate, ValidationError
 
+
 class SchemaValidator:
     def validate(self, data, schema):
         try:

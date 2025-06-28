@@ -9,7 +9,8 @@ from jsonAI.main import Jsonformer
 
 # Load a small model and tokenizer for the example
 # In a real application, you might load a larger model
-model_name = "gpt2"  # Using gpt2 as a small example model
+model_name = "gpt2"
+# Using gpt2 as a small example model
 model = AutoModelForCausalLM.from_pretrained(model_name)
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 
@@ -20,7 +21,8 @@ app = FastAPI()
 class GenerateRequest(BaseModel):
     prompt: str
     json_schema: Optional[Dict[str, Any]] = None
-    output_format: Optional[str] = "json"  # Output type (json, xml, yaml)
+    output_format: Optional[str] = "json"
+    # Output type (json, xml, yaml)
     validate_output: Optional[bool] = False  # Validate output
 
 
@@ -38,7 +40,8 @@ async def generate_structured_data(request: GenerateRequest):
                 "value": {"type": "integer"}
             }
         }
-        print("Using default schema:", request.json_schema)  # Log default schema usage
+        # Log default schema usage
+        print("Using default schema:", request.json_schema)
 
     try:
         jsonformer_instance = Jsonformer(
@@ -55,14 +58,16 @@ async def generate_structured_data(request: GenerateRequest):
         # FastAPI handles JSON (dict/list) automatically.
         # For XML/YAML, we return PlainTextResponse with the correct media type.
         if request.output_format == "json":
-            return generated_data # generated_data is a dict for JSON
+            return generated_data  # generated_data is a dict for JSON
         else:
-            media_type = "application/xml" if request.output_format == "xml" else "application/yaml"
-            return PlainTextResponse(content=generated_data, media_type=media_type) # generated_data is a string for XML/YAML
+            media_type = ("application/xml" if request.output_format == "xml" else "application/yaml")
+            return PlainTextResponse(content=generated_data, media_type=media_type)
+            # generated_data is a string for XML/YAML
 
     except Exception as e:
         # Basic error handling
-        print(f"An error occurred: {e}")  # Log the error
+        # Log the error
+        print(f"An error occurred: {e}")
         # Return a JSON error response even for non-JSON requests for consistency
         return {"error": str(e)}
 

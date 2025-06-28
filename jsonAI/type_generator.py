@@ -1,5 +1,5 @@
 import torch
-from typing import Any, Dict, List, Set, Union
+from typing import Union
 from transformers import PreTrainedModel, PreTrainedTokenizer
 from jsonAI.logits_processors import (
     NumberStoppingCriteria,
@@ -11,10 +11,7 @@ from jsonAI.logits_processors import (
 from jsonAI.prob_choice_tree import prob_choice_tree, round_to_nsf
 from jsonAI.type_prefixes import get_prefix_tokens_for_types
 from termcolor import cprint
-import json
-import base64
-import uuid
-from datetime import datetime, date, time
+
 
 class TypeGenerator:
     def __init__(
@@ -64,9 +61,7 @@ class TypeGenerator:
             temperature=temperature or self.temperature,
             pad_token_id=self.tokenizer.eos_token_id,
         )
-        response = self.tokenizer.decode(
-            response[0], skip_special_tokens=True
-        )
+        response = self.tokenizer.decode(response[0], skip_special_tokens=True)
 
         response = response[len(prompt) :]
         if "," in response:
@@ -101,9 +96,7 @@ class TypeGenerator:
             temperature=temperature or self.temperature,
             pad_token_id=self.tokenizer.eos_token_id,
         )
-        response = self.tokenizer.decode(
-            response[0], skip_special_tokens=True
-        )
+        response = self.tokenizer.decode(response[0], skip_special_tokens=True)
 
         response = response[len(prompt) :]
         if "," in response:

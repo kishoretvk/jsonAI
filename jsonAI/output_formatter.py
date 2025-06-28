@@ -2,6 +2,7 @@ import json
 import xml.etree.ElementTree as ET
 import yaml
 
+
 class OutputFormatter:
     def format(self, data, output_format='json'):
         if output_format == 'json':
