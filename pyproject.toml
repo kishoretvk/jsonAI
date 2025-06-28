@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "jsonAI"
-version = "0.12.3"
+version = "0.12.4"  # Incremented from 0.12.3
 description = ""
 authors = ["1rgs <kishoretvk9@gmail.com>"]
 readme = "README.md"

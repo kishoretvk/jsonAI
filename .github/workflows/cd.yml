@@ -11,6 +11,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for version bumping
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -22,6 +24,21 @@ jobs:
 
     - name: Install dependencies
       run: poetry install
+
+    - name: Bump version
+      run: |
+        # Extract current version from pyproject.toml
+        CURRENT_VERSION=$(poetry version -s)
+        # Increment patch version (e.g., 0.12.3 -> 0.12.4)
+        poetry version patch
+        NEW_VERSION=$(poetry version -s)
+        echo "Bumped version from $CURRENT_VERSION to $NEW_VERSION"
+        # Update the tag to match the new version
+        git config user.name "GitHub Action"
+        git config user.email "action@github.com"
+        git commit -am "Bump version to $NEW_VERSION"
+        git tag -f v$NEW_VERSION
+        git push origin v$NEW_VERSION --force
 
     - name: Build package
       run: poetry build
@@ -37,7 +54,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
+        tag_name: v${{ env.NEW_VERSION }}
+        release_name: Release v${{ env.NEW_VERSION }}
         draft: false
         prerelease: false
