@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "jsonAI"
-version = "0.12.1"
+version = "0.12.2"
 description = ""
 authors = ["1rgs <kishoretvk9@gmail.com>"]
 readme = "README.md"
@@ -19,7 +19,7 @@ lxml = "^5.2.2"
 
 [tool.poetry.group.dev.dependencies]
 pandas = "^2.2.2"
-ipykernel = "^6.22.0"
+ipykernel = "^6.2.0"
 torch = "^2.0.0"
 accelerate = "^0.18.0"
 bitsandbytes = "^0.38.1"
