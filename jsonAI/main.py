@@ -300,5 +300,3 @@ Result: ```json
         return formatted_output
 
 # FIX: W292 - Added a newline at the end of the file.
-
-
