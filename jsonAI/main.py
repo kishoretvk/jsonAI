@@ -298,4 +298,3 @@ Result: ```json
         )
 
         return formatted_output
-    
