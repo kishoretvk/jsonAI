@@ -84,7 +84,6 @@ class Jsonformer:
             logits = output.logits[0, -1]
 
             top_indices = logits.topk(30).indices
-            # FIX: E501 - Broke down a long, complex line
             sorted_indices = logits[top_indices].argsort(descending=True)
             sorted_token_ids = top_indices[sorted_indices]
 

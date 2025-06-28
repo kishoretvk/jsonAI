@@ -19,7 +19,7 @@ lxml = "^5.2.2"
 
 [tool.poetry.group.dev.dependencies]
 pandas = "^2.2.2"
-ipykernel = "^6.2.0"
+ipykernel = "^6.22.0"
 torch = "^2.0.0"
 accelerate = "^0.18.0"
 bitsandbytes = "^0.38.1"
