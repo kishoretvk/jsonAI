@@ -206,3 +206,6 @@ class TypeGenerator:
 
         if round is not None:
             total = round_to_nsf(total, round)
+
+# FIX: W292 - Added a newline at the end of the file.
+
