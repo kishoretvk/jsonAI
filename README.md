@@ -39,7 +39,7 @@ This currently supports a subset of JSON Schema. Below is a list of the supporte
 
 ## Supported Output Formats
 
-In addition to JSON, `jsonAI` now supports generating output in XML and YAML formats. You can specify the desired format using the `output_format` parameter in the `Jsonformer` constructor.
+In addition to JSON, `jsonAI` supports generating output in XML, YAML, and CSV formats. You can specify the desired format using the `output_format` parameter in the `Jsonformer` constructor.
 
 **XML Output Example:**
 
@@ -72,6 +72,41 @@ jsonformer = Jsonformer(
     json_schema=json_schema,
     prompt=prompt,
     output_format="xml"
+)
+
+    generated_data = jsonformer()
+    print(generated_data)
+```
+
+**CSV Output Example:**
+
+```python
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from jsonAI.main import Jsonformer
+
+model = AutoModelForCausalLM.from_pretrained("gpt2")
+tokenizer = AutoTokenizer.from_pretrained("gpt2")
+
+json_schema = {
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "age": {"type": "integer"},
+            "score": {"type": "number"}
+        }
+    }
+}
+
+prompt = "Generate data for three students with names, ages, and test scores."
+
+jsonformer = Jsonformer(
+    model=model,
+    tokenizer=tokenizer,
+    json_schema=json_schema,
+    prompt=prompt,
+    output_format="csv"
 )
 
 generated_data = jsonformer()
@@ -283,12 +318,12 @@ print(generated_data)
 
 ## Probabilistic Generation
 
-`jsonAI` includes features for probabilistic structured generation, allowing you to extract probability distributions or weighted means for certain types.
+`jsonAI` includes advanced features for probabilistic structured generation, allowing you to extract probability distributions or weighted means for certain types.
 
 ### Supported Probabilistic Types:
 
--   `p_enum`: Returns a list of possible values and their probabilities for an enumeration.
--   `p_integer`: Returns the probabilistic weighted mean for an integer range.
+-   `p_enum`: Returns a list of possible values and their probabilities for an enumeration
+-   `p_integer`: Returns the probabilistic weighted mean for an integer range
 
 ### Example:
 
@@ -413,7 +448,7 @@ KL_div_loss is the -1 * KL divergence between the true distribution and the gene
 ## Example
 
 ```python
-from prob_jsonformer import Jsonformer
+from jsonAI.main import Jsonformer
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 model_name = "databricks/dolly-v2-3b"
@@ -444,7 +479,12 @@ json_schema = {
 }
 
 prompt = "Generate a young person's information based on the following schema:"
-jsonformer = Jsonformer(model, tokenizer, json_schema, prompt, temperature=0)
+jsonformer = Jsonformer(
+    model_backend=(model, tokenizer),
+    json_schema=json_schema,
+    prompt=prompt,
+    temperature=0
+)
 generated_data = jsonformer()
 
 generated_data = {
