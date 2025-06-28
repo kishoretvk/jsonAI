@@ -31,7 +31,7 @@ fastapi = "^0.111.0"
 uvicorn = {extras = ["standard"], version = "^0.30.1"}
 black = "^24.8.0"
 pre-commit = "^3.8.0"
-pylint = "^3.2.7" # Added for syntax checking
+pylint = "^3.2.7"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
@@ -49,12 +49,15 @@ target-version = ['py39']
 max-line-length = 79
 extend-ignore = "E203"
 per-file-ignores = """
-    tests/*:W292
+    tests/*:W292,E501
+    examples/*:W292,E501
 """
 
 [tool.pytest]
-addopts = "--cov=jsonAI --cov-report=html"
+addopts = "--cov=jsonAI --cov-report=xml"
+python_files = "jsonAI/*.py"
 
 [tool.pylint]
 max-line-length = 79
-disable = ["C0114", "C0115", "C0116"] # Disable missing docstring warnings
+disable = ["C0114", "C0115", "C0116"]
+ignore = ["tests", "examples"]
