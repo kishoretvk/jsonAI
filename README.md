@@ -89,6 +89,30 @@ output = jsonformer()
 print(output)
 ```
 
+## Output Format × Type Coverage
+
+| Type      | JSON | XML  | YAML | CSV* |
+|-----------|------|------|------|------|
+| number    | ✅   | ✅   | ✅   | ✅   |
+| integer   | ✅   | ✅   | ✅   | ✅   |
+| boolean   | ✅   | ✅   | ✅   | ✅   |
+| string    | ✅   | ✅   | ✅   | ✅   |
+| datetime  | ✅   | ✅   | ✅   | ✅   |
+| date      | ✅   | ✅   | ✅   | ✅   |
+| time      | ✅   | ✅   | ✅   | ✅   |
+| uuid      | ✅   | ✅   | ✅   | ✅   |
+| binary    | ✅   | ✅   | ✅   | ✅   |
+| null      | ✅   | (⚠️) | ✅   | (⚠️) |
+| array     | ✅   | ✅   | ✅   | (⚠️) |
+| object    | ✅   | ✅   | ✅   | (⚠️) |
+| enum      | ✅   | ✅   | ✅   | ✅   |
+| p_enum    | ✅   | ✅   | ✅   | ✅   |
+| p_integer | ✅   | ✅   | ✅   | ✅   |
+
+✅ = Supported
+⚠️ = Supported with caveats (e.g., nulls in XML/CSV, arrays/objects in CSV)
+*CSV: Only arrays of objects (tabular) are practical
+
 ## License
 
 This project is licensed under the MIT License.
