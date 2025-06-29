@@ -1,0 +1,71 @@
+import click
+import json
+from jsonAI.main import Jsonformer, AsyncJsonformer
+from jsonAI.model_backends import TransformersBackend, OllamaBackend
+from jsonAI.schema_generator import SchemaGenerator
+from transformers import AutoModelForCausalLM, AutoTokenizer
+import asyncio
+
+@click.group()
+def cli():
+    pass
+
+@cli.command()
+@click.option("--schema", type=click.File('r'), required=True, help="JSON schema file")
+@click.option("--prompt", required=True, help="Generation prompt")
+@click.option("--model", default="gpt2", help="Model name (for transformers)")
+@click.option("--use-ollama", is_flag=True, help="Use Ollama backend")
+@click.option("--ollama-model", default="llama2", help="Ollama model name")
+@click.option("--output-format", default="json", help="Output format (json, yaml, xml, csv)")
+@click.option("--async", "use_async", is_flag=True, help="Use async generation")
+def generate(schema, prompt, model, use_ollama, ollama_model, output_format, use_async):
+    """Generate structured data from a schema and prompt"""
+    json_schema = json.load(schema)
+    
+    if use_ollama:
+        backend = OllamaBackend(model_name=ollama_model)
+    else:
+        tokenizer = AutoTokenizer.from_pretrained(model)
+        model = AutoModelForCausalLM.from_pretrained(model)
+        backend = TransformersBackend(model, tokenizer)
+    
+    if use_async:
+        jsonformer = Jsonformer(
+            model_backend=backend,
+            json_schema=json_schema,
+            prompt=prompt,
+            output_format=output_format
+        )
+        async_jsonformer = AsyncJsonformer(jsonformer)
+        result = asyncio.run(async_jsonformer())
+    else:
+        jsonformer = Jsonformer(
+            model_backend=backend,
+            json_schema=json_schema,
+            prompt=prompt,
+            output_format=output_format
+        )
+        result = jsonformer()
+    
+    click.echo(result)
+
+@cli.command()
+@click.option("--description", required=True, help="Natural language schema description")
+@click.option("--model", default="gpt2", help="Model name (for transformers)")
+@click.option("--use-ollama", is_flag=True, help="Use Ollama backend")
+@click.option("--ollama-model", default="llama2", help="Ollama model name")
+def generate_schema(description, model, use_ollama, ollama_model):
+    """Generate JSON schema from natural language description"""
+    if use_ollama:
+        backend = OllamaBackend(model_name=ollama_model)
+    else:
+        tokenizer = AutoTokenizer.from_pretrained(model)
+        model = AutoModelForCausalLM.from_pretrained(model)
+        backend = TransformersBackend(model, tokenizer)
+    
+    generator = SchemaGenerator(backend)
+    schema = generator.generate_schema(description)
+    click.echo(json.dumps(schema, indent=2))
+
+if __name__ == "__main__":
+    cli()
