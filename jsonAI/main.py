@@ -98,6 +98,23 @@ class Jsonformer:
         obj: Union[Dict[str, Any], List[Any]],
         key: Union[str, None] = None,
     ) -> Any:
+        # --- Advanced JSON Schema combinators ---
+        if 'oneOf' in schema:
+            # For now, select the first schema; can be improved with LLM or user hint
+            chosen_schema = schema['oneOf'][0]
+            return self.generate_value(chosen_schema, obj, key)
+        elif 'anyOf' in schema:
+            chosen_schema = schema['anyOf'][0]
+            return self.generate_value(chosen_schema, obj, key)
+        elif 'allOf' in schema:
+            merged_schema = self.merge_schemas(schema['allOf'])
+            return self.generate_value(merged_schema, obj, key)
+        # --- Custom format support ---
+        if 'format' in schema and hasattr(self, 'format_registry'):
+            handler = self.format_registry.get(schema['format'])
+            if handler:
+                return handler(schema)
+        # --- Existing type handling ---
         schema_type = schema["type"]
         if isinstance(schema_type, list):
             if key:
@@ -134,6 +151,21 @@ class Jsonformer:
             return type_handlers[schema_type](prompt)
         else:
             raise ValueError(f"Unsupported schema type: {schema_type}")
+
+    def merge_schemas(self, schemas: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Merge multiple schemas for allOf support (simple deep merge)."""
+        merged = {}
+        for s in schemas:
+            merged = self.deep_merge(merged, s)
+        return merged
+
+    def deep_merge(self, a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
+        for k, v in b.items():
+            if k in a and isinstance(a[k], dict) and isinstance(v, dict):
+                a[k] = self.deep_merge(a[k], v)
+            else:
+                a[k] = v
+        return a
 
     def get_prompt(self):
         template = """{prompt}
