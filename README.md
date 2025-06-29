@@ -208,6 +208,38 @@ To run the FastAPI example:
 
 ## Basic Usage
 
+### TypeGenerator Examples
+```python
+from jsonAI.type_generator import TypeGenerator
+from jsonAI.model_backends import TransformersBackend
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+# With tokenizer backend
+model = AutoModelForCausalLM.from_pretrained("gpt2")
+tokenizer = AutoTokenizer.from_pretrained("gpt2")
+backend = TransformersBackend(model, tokenizer)
+
+# Initialize TypeGenerator
+type_gen = TypeGenerator(
+    backend,
+    debug=print,  # Simple debug function
+    max_number_tokens=6,
+    max_string_token_length=50
+)
+
+# Generate values
+number = type_gen.generate_number("Generate a number:")
+string = type_gen.generate_string("Generate a name:")
+boolean = type_gen.generate_boolean("Is this true?")
+
+# With simple backend (no tokenizer)
+class SimpleBackend:
+    def generate(self, prompt, **kwargs):
+        return "42"  # Simple response
+
+simple_type_gen = TypeGenerator(SimpleBackend(), debug=print)
+number = simple_type_gen.generate_number("Generate a number:")  # Will use simple backend
+```
 
 ## Examples
 
