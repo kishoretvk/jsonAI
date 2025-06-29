@@ -1,12 +1,15 @@
-from typing import List, Union, Dict, Any
-
+from typing import List, Union, Dict, Any, Callable, Optional
+import asyncio
 from termcolor import cprint
 from transformers import PreTrainedModel, PreTrainedTokenizer
 import json
 
+from jsonAI.model_backends import ModelBackend
 from jsonAI.type_generator import TypeGenerator
 from jsonAI.output_formatter import OutputFormatter
 from jsonAI.schema_validator import SchemaValidator
+from jsonAI.tool_registry import ToolRegistry
+from jsonAI.async_tool_executor import AsyncToolExecutor, ToolExecutionError
 
 
 GENERATION_MARKER = "|GENERATION|"
@@ -17,8 +20,7 @@ class Jsonformer:
 
     def __init__(
         self,
-        model: PreTrainedModel,
-        tokenizer: PreTrainedTokenizer,
+        model_backend: ModelBackend,
         json_schema: Dict[str, Any],
         prompt: str,
         *,
@@ -29,19 +31,21 @@ class Jsonformer:
         max_number_tokens: int = 6,
         temperature: float = 1.0,
         max_string_token_length: int = 175,
+        tool_registry: Optional[ToolRegistry] = None,
+        mcp_callback: Optional[Callable] = None,
     ):
-        self.model = model
-        self.tokenizer = tokenizer
+        self.model_backend = model_backend
         self.json_schema = json_schema
         self.prompt = prompt
         self.output_format = output_format
         self.validate_output = validate_output
+        self.tool_registry = tool_registry
+        self.mcp_callback = mcp_callback
         self.debug_on = debug
 
         self.type_generator = TypeGenerator(
-            model=model,
-            tokenizer=tokenizer,
-            debug=self.debug,
+            model_backend=self.model_backend,
+            debug=self.debug_on,
             max_number_tokens=max_number_tokens,
             max_string_token_length=max_string_token_length,
             temperature=temperature,
@@ -79,35 +83,47 @@ class Jsonformer:
             obj.append(self.generation_marker)
             input_prompt = self.get_prompt()
             obj.pop()
-            input_tensor = self.tokenizer.encode(
-                input_prompt, return_tensors="pt"
-            )
-            output = self.model.forward(
-                input_tensor.to(self.model.device)
-            )
-            logits = output.logits[0, -1]
-
-            top_indices = logits.topk(30).indices
-            sorted_indices = logits[top_indices].argsort(
-                descending=True
-            )
-            sorted_token_ids = top_indices[sorted_indices]
-
-            found_comma = False
-            found_close_bracket = False
-
-            for token_id in sorted_token_ids:
-                decoded_token = self.tokenizer.decode(
-                    token_id, skip_special_tokens=True
+            # This part is tricky with the new backend.
+            # We need a way to get logits from the backend, which might not be possible with Ollama.
+            # For now, we will assume the backend can provide logits.
+            # This will need to be revisited.
+            if hasattr(self.model_backend, "tokenizer") and hasattr(self.model_backend, "model"):
+                input_tensor = self.model_backend.tokenizer.encode(
+                    input_prompt, return_tensors="pt"
                 )
-                if "," in decoded_token:
-                    found_comma = True
-                    break
-                if "]" in decoded_token:
-                    found_close_bracket = True
-                    break
+                output = self.model_backend.model.forward(
+                    input_tensor.to(self.model_backend.model.device)
+                )
+                logits = output.logits[0, -1]
 
-            if found_close_bracket or not found_comma:
+                top_indices = logits.topk(30).indices
+            else:
+                # If the backend doesn't support getting logits, we can't determine if we should continue the array.
+                # We will just break.
+                break
+            if hasattr(self.model_backend, "tokenizer"):
+                sorted_indices = logits[top_indices].argsort(
+                    descending=True
+                )
+                sorted_token_ids = top_indices[sorted_indices]
+
+                found_comma = False
+                found_close_bracket = False
+
+                for token_id in sorted_token_ids:
+                    decoded_token = self.model_backend.tokenizer.decode(
+                        token_id, skip_special_tokens=True
+                    )
+                    if "," in decoded_token:
+                        found_comma = True
+                        break
+                    if "]" in decoded_token:
+                        found_close_bracket = True
+                        break
+
+                if found_close_bracket or not found_comma:
+                    break
+            else:
                 break
 
         return obj
@@ -121,13 +137,17 @@ class Jsonformer:
             return possible_types[0]
 
         prompt = self.get_prompt()
-        input_tensor = self.tokenizer.encode(
-            prompt, return_tensors="pt"
-        )
-        output = self.model.forward(
-            input_tensor.to(self.model.device)
-        )
-        logits = output.logits[0, -1]
+        if hasattr(self.model_backend, "tokenizer") and hasattr(self.model_backend, "model"):
+            input_tensor = self.model_backend.tokenizer.encode(
+                prompt, return_tensors="pt"
+            )
+            output = self.model_backend.model.forward(
+                input_tensor.to(self.model_backend.model.device)
+            )
+            logits = output.logits[0, -1]
+        else:
+            # If we can't get logits, we can't choose a type. We'll just pick the first one.
+            return possible_types[0]
 
         max_type = None
         max_logit = -float("inf")
@@ -288,18 +308,114 @@ Result: ```json
 
         return prompt
 
-    def __call__(self) -> Union[Dict[str, Any], str]:
+    def _execute_tool_call(self, generated_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Checks for and executes a tool call if defined in the schema."""
+        tool_call_config = self.json_schema.get("x-jsonai-tool-call")
+        
+        if not self.tool_registry or not tool_call_config:
+            return {"generated_data": generated_data}
+
+        tool_name = tool_call_config.get("name")
+        tool = self.tool_registry.get_tool(tool_name)
+
+        if not tool:
+            raise ValueError(f"Tool '{tool_name}' not found in the registry.")
+
+        # Map generated data to tool arguments
+        arg_map = tool_call_config.get("arguments", {})
+        kwargs = {
+            tool_arg: generated_data.get(json_key)
+            for tool_arg, json_key in arg_map.items()
+        }
+
+        # Execute the tool
+        if callable(tool): # It's a Python function
+            tool_result = tool(**kwargs)
+        else: # It's an MCP tool
+            if not self.mcp_callback:
+                raise ValueError("mcp_callback must be provided to execute MCP tools.")
+            # Invoke the callback provided by the environment
+            tool_result = self.mcp_callback(tool_name, tool['server_name'], kwargs)
+            
+        return {
+            "generated_data": generated_data,
+            "tool_name": tool_name,
+            "tool_arguments": kwargs,
+            "tool_result": tool_result
+        }
+
+    def generate_data(self) -> Dict[str, Any]:
+        """Generate structured data without tool execution"""
         self.value = {}
         generated_data = self.generate_object(
             self.json_schema["properties"], self.value
         )
-
+        
         # Validate if enabled
         if self.validate_output and self.schema_validator:
             self.schema_validator.validate(generated_data, self.json_schema)
+            
+        return generated_data
+
+    def __call__(self) -> Union[Dict[str, Any], str]:
+        generated_data = self.generate_data()
+        
+        # Check for tool call and execute if needed
+        result = self._execute_tool_call(generated_data)
 
         # Format the output
         formatted_output = self.output_formatter.format(
-            generated_data, self.output_format
+            result, self.output_format
         )
         return formatted_output
+
+
+class AsyncJsonformer:
+    def __init__(self, jsonformer: Jsonformer):
+        self.jsonformer = jsonformer
+        self.tool_executor = AsyncToolExecutor()
+
+    async def __call__(self) -> Union[Dict[str, Any], str]:
+        # Run synchronous generation in thread
+        loop = asyncio.get_running_loop()
+        generated_data = await loop.run_in_executor(
+            None, self.jsonformer.generate_data
+        )
+        
+        # Check for tool call
+        tool_call_config = self.jsonformer.json_schema.get("x-jsonai-tool-call")
+        if not self.jsonformer.tool_registry or not tool_call_config:
+            return generated_data
+
+        # Execute tool asynchronously
+        tool_name = tool_call_config.get("name")
+        tool = self.jsonformer.tool_registry.get_tool(tool_name)
+        if not tool:
+            raise ValueError(f"Tool '{tool_name}' not found in registry")
+
+        # Prepare tool arguments
+        arg_map = tool_call_config.get("arguments", {})
+        kwargs = {
+            tool_arg: generated_data.get(json_key)
+            for tool_arg, json_key in arg_map.items()
+        }
+
+        # Execute tool
+        if callable(tool):
+            tool_result = await self.tool_executor.execute(tool, **kwargs)
+        else:  # MCP tool
+            if not self.jsonformer.mcp_callback:
+                raise ValueError("mcp_callback required for MCP tools")
+            tool_result = await self.tool_executor.execute(
+                self.jsonformer.mcp_callback, 
+                tool_name, 
+                tool['server_name'], 
+                kwargs
+            )
+            
+        return {
+            "generated_data": generated_data,
+            "tool_name": tool_name,
+            "tool_arguments": kwargs,
+            "tool_result": tool_result
+        }
