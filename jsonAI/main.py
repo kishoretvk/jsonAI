@@ -1,7 +1,6 @@
 from typing import List, Union, Dict, Any, Callable, Optional
 import asyncio
 from termcolor import cprint
-from transformers import PreTrainedModel, PreTrainedTokenizer
 import json
 
 from jsonAI.model_backends import ModelBackend
@@ -74,101 +73,48 @@ class Jsonformer:
         return obj
 
     def generate_array(
-        self, item_schema: Dict[str, Any], obj: List[Any]
+        self, 
+        item_schema: Dict[str, Any], 
+        obj: List[Any]
     ) -> list:
+        """Generate an array following the item schema.
+        
+        Uses TypeGenerator's helper methods when possible for consistent behavior.
+        """
         for _ in range(self.max_array_length):
+            # Generate array element
             element = self.generate_value(item_schema, obj)
             obj[-1] = element
 
+            # Check if we should continue the array
             obj.append(self.generation_marker)
             input_prompt = self.get_prompt()
             obj.pop()
-            # This part is tricky with the new backend.
-            # We need a way to get logits from the backend, which might not be possible with Ollama.
-            # For now, we will assume the backend can provide logits.
-            # This will need to be revisited.
-            if hasattr(self.model_backend, "tokenizer") and hasattr(self.model_backend, "model"):
-                input_tensor = self.model_backend.tokenizer.encode(
-                    input_prompt, return_tensors="pt"
+            
+            if hasattr(self.type_generator, '_generate_with_processor'):
+                # Use TypeGenerator's standardized approach
+                should_continue = self.type_generator._generate_with_processor(
+                    prompt=input_prompt,
+                    max_tokens=1,
+                    post_process=lambda x: "," in x and "]" not in x
                 )
-                output = self.model_backend.model.forward(
-                    input_tensor.to(self.model_backend.model.device)
-                )
-                logits = output.logits[0, -1]
-
-                top_indices = logits.topk(30).indices
-            else:
-                # If the backend doesn't support getting logits, we can't determine if we should continue the array.
-                # We will just break.
-                break
-            if hasattr(self.model_backend, "tokenizer"):
-                sorted_indices = logits[top_indices].argsort(
-                    descending=True
-                )
-                sorted_token_ids = top_indices[sorted_indices]
-
-                found_comma = False
-                found_close_bracket = False
-
-                for token_id in sorted_token_ids:
-                    decoded_token = self.model_backend.tokenizer.decode(
-                        token_id, skip_special_tokens=True
-                    )
-                    if "," in decoded_token:
-                        found_comma = True
-                        break
-                    if "]" in decoded_token:
-                        found_close_bracket = True
-                        break
-
-                if found_close_bracket or not found_comma:
+                if not should_continue:
                     break
             else:
+                # Fallback to original behavior if helper method isn't available
                 break
 
         return obj
 
     def choose_type_to_generate(self, possible_types: List[str]) -> str:
-        possible_types = list(set(possible_types))  # remove duplicates
-        self.debug("[choose_type_to_generate]", str(possible_types))
-        if len(possible_types) < 1:
-            raise ValueError("Union type must not be empty")
-        elif len(possible_types) == 1:
-            return possible_types[0]
-
-        prompt = self.get_prompt()
-        if hasattr(self.model_backend, "tokenizer") and hasattr(self.model_backend, "model"):
-            input_tensor = self.model_backend.tokenizer.encode(
-                prompt, return_tensors="pt"
-            )
-            output = self.model_backend.model.forward(
-                input_tensor.to(self.model_backend.model.device)
-            )
-            logits = output.logits[0, -1]
-        else:
-            # If we can't get logits, we can't choose a type. We'll just pick the first one.
-            return possible_types[0]
-
-        max_type = None
-        max_logit = -float("inf")
-        for possible_type in possible_types:
-            try:
-                prefix_tokens = self.type_generator.type_prefix_tokens[
-                    possible_type
-                ]
-            except KeyError:
-                raise ValueError(f"Unsupported schema type: {possible_type}")
-            max_type_logit = logits[prefix_tokens].max()
-            if max_type_logit > max_logit:
-                max_type = possible_type
-                max_logit = max_type_logit
-
-        if max_type is None:
-            raise Exception(
-                "Unable to find best type to generate for union type"
-            )
-        self.debug("[choose_type_to_generate]", max_type)
-        return max_type
+        """Select which type to generate from possible options.
+        
+        Delegates to TypeGenerator's choose_type() method.
+        """
+        return self.type_generator.choose_type(
+            prompt=self.get_prompt(),
+            possible_types=possible_types
+        )
 
     def generate_value(
         self,

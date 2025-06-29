@@ -1,4 +1,5 @@
 from jsonAI.main import Jsonformer
+from jsonAI.type_generator import TypeGenerator
 from jsonAI.model_backends import OllamaBackend, TransformersBackend
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -37,6 +38,19 @@ def test_ollama_integration():
     print("--- Ollama Integration Test ---")
     print(generated_data)
     print("-----------------------------")
+
+def test_type_selection_fallback():
+    """Test the weighted random fallback for type selection"""
+    class SimpleBackend:
+        def generate(self, prompt, **kwargs):
+            return "test"  # Simple response
+    
+    backend = SimpleBackend()
+    type_gen = TypeGenerator(backend, lambda *args: print(args))
+    
+    # Should use fallback selection
+    selected = type_gen.choose_type("test", ["string", "number"])
+    assert selected in ["string", "number"]
 
 def test_hf_backend_compatibility():
     # Ensure the original Hugging Face backend still works
