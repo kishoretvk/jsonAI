@@ -14,7 +14,14 @@ class AsyncGenerator:
 
     async def generate_value(self, value_type: str, prompt: str, **kwargs) -> Any:
         """Generate typed value asynchronously"""
-        if value_type == "string":
-            return await self.generate(prompt, **kwargs)
-        # Add other types as needed
-        raise ValueError(f"Unsupported value type: {value_type}")
+        type_handlers = {
+            "string": self.generate,
+            "number": self.generate,
+            "boolean": self.generate,
+            # Add more types as needed
+        }
+
+        if value_type in type_handlers:
+            return await type_handlers[value_type](prompt, **kwargs)
+        else:
+            raise ValueError(f"Unsupported value type: {value_type}")

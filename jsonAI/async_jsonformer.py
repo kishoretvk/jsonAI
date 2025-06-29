@@ -44,9 +44,10 @@ class FullAsyncJsonformer:
     async def agenerate_object(
         self, properties: Dict[str, Any], obj: Dict[str, Any]
     ) -> Dict[str, Any]:
-        for key, schema in properties.items():
-            obj[key] = await self.agenerate_value(schema, obj, key)
-        return obj
+        """Generate an object asynchronously."""
+        tasks = [self.agenerate_value(schema, obj, key) for key, schema in properties.items()]
+        results = await asyncio.gather(*tasks)
+        return dict(zip(properties.keys(), results))
 
     async def agenerate_value(
         self,

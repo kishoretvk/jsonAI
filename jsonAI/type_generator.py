@@ -1,5 +1,5 @@
 import torch
-from typing import Union, Callable
+from typing import Union, Callable, List
 from transformers import PreTrainedModel, PreTrainedTokenizer
 from jsonAI.model_backends import ModelBackend
 from jsonAI.logits_processors import (
@@ -14,8 +14,9 @@ from jsonAI.type_prefixes import get_prefix_tokens_for_types
 
 
 class TypeGenerator:
-    """Generates values of different types according to a schema using a language model.
-    
+    """
+    Generates values of different types according to a schema using a language model.
+
     Handles generation of:
     - Numbers (floats and integers)
     - Strings
@@ -24,25 +25,26 @@ class TypeGenerator:
     - Dates/times
     - UUIDs
     - Binary data
-    
+
     Backend Requirements:
     - Basic backends must implement generate()
     - Advanced features require:
       * tokenizer property
       * model property
       * generate() with logits processing
-    
+
     Args:
         model_backend: The model backend to use for generation
         debug: Debug logging function (str, str, bool) -> None
         max_number_tokens: Maximum tokens to generate for numbers
-        max_string_token_length: Maximum tokens to generate for strings  
+        max_string_token_length: Maximum tokens to generate for strings
         temperature: Sampling temperature for generation (0.0-2.0)
-        
+
     Note:
         For probabilistic enums and precise type selection, use TransformersBackend
         or another backend that provides tokenizer and model access.
     """
+
     def __init__(
         self,
         model_backend: ModelBackend,
@@ -51,7 +53,19 @@ class TypeGenerator:
         max_string_token_length: int = 175,
         temperature: float = 1.0,
     ):
-        """Initialize the type generator with configuration and model backend."""
+        """
+        Initialize the type generator with configuration and model backend.
+
+        Args:
+            model_backend (ModelBackend): The model backend to use for generation.
+            debug (Callable): Debug logging function.
+            max_number_tokens (int): Maximum tokens to generate for numbers.
+            max_string_token_length (int): Maximum tokens to generate for strings.
+            temperature (float): Sampling temperature for generation.
+
+        Raises:
+            ValueError: If the model backend is incompatible.
+        """
         self.model_backend = model_backend
         self.debug = debug
         self.max_number_tokens = max_number_tokens
@@ -77,61 +91,65 @@ class TypeGenerator:
         post_process: Callable = None,
         iterations=0
     ):
-        """Shared generation logic with processor and criteria.
-        
+        """
+        Shared generation logic with processor and criteria.
+
         Args:
-            prompt: Input prompt to generate from
-            max_tokens: Maximum tokens to generate
-            logits_processor: Optional logits processor
-            stopping_criteria: Optional stopping criteria
-            temperature: Sampling temperature
-            post_process: Function to post-process generated text
-            iterations: Retry counter for error handling
-            
+            prompt (str): Input prompt to generate from.
+            max_tokens (int): Maximum tokens to generate.
+            logits_processor (Callable): Optional logits processor.
+            stopping_criteria (Callable): Optional stopping criteria.
+            temperature (float): Sampling temperature.
+            post_process (Callable): Function to post-process generated text.
+            iterations (int): Retry counter for error handling.
+
         Returns:
-            Generated text after applying processors and post-processing
+            str: Generated text after applying processors and post-processing.
+
+        Raises:
+            RuntimeError: If generation fails after retries.
         """
         self.debug("[_generate_with_processor]", prompt, is_prompt=True)
-        
-        if hasattr(self.model_backend, "tokenizer"):
-            input_tokens = self.model_backend.tokenizer.encode(prompt, return_tensors="pt").to(
-                self.model_backend.model.device
-            )
+
+        if not hasattr(self.model_backend, "tokenizer"):
+            raise ValueError("Model backend does not support tokenization.")
+
+        input_tokens = self.model_backend.tokenizer.encode(prompt, return_tensors="pt").to(
+            self.model_backend.model.device
+        )
+
+        try:
             response = self.model_backend.model.generate(
                 input_tokens,
-                max_new_tokens=max_tokens,
-                num_return_sequences=1,
+                max_length=max_tokens,
+                temperature=temperature or self.temperature,
                 logits_processor=logits_processor,
                 stopping_criteria=stopping_criteria,
-                temperature=temperature or self.temperature,
-                pad_token_id=self.model_backend.tokenizer.eos_token_id,
             )
-            response = self.model_backend.tokenizer.decode(response[0], skip_special_tokens=True)
-        else:
-            response = self.model_backend.generate(
-                prompt,
-                max_new_tokens=max_tokens,
-                temperature=temperature or self.temperature,
-            )
-
-        response = response[len(prompt):]
-        if post_process:
-            response = post_process(response)
-        return response
+            generated_text = self.model_backend.tokenizer.decode(response[0], skip_special_tokens=True)
+            return post_process(generated_text) if post_process else generated_text
+        except Exception as e:
+            if iterations < 3:
+                self.debug("Retrying generation due to error:", str(e), is_prompt=False)
+                return self._generate_with_processor(
+                    prompt, max_tokens, logits_processor, stopping_criteria, temperature, post_process, iterations + 1
+                )
+            else:
+                raise RuntimeError(f"Generation failed after retries: {e}")
 
     def generate_number(
         self, prompt: str, temperature: Union[float, None] = None, iterations=0
     ) -> float:
         """Generate a floating point number from the model.
-        
+
         Args:
             prompt: The input prompt to condition generation
             temperature: Sampling temperature (higher = more random)
             iterations: Internal retry counter for error handling
-            
+
         Returns:
             Generated number as float
-            
+
         Raises:
             ValueError: If generation fails after max retries
         """
@@ -161,15 +179,15 @@ class TypeGenerator:
         self, prompt: str, temperature: Union[float, None] = None, iterations=0
     ) -> int:
         """Generate an integer from the model.
-        
+
         Args:
-            prompt: The input prompt to condition generation  
+            prompt: The input prompt to condition generation
             temperature: Sampling temperature (higher = more random)
             iterations: Internal retry counter for error handling
-            
+
         Returns:
             Generated number as integer
-            
+
         Raises:
             ValueError: If generation fails after max retries
         """
@@ -197,15 +215,15 @@ class TypeGenerator:
 
     def generate_boolean(self, prompt: str) -> bool:
         """Generate a boolean (true/false) from the model.
-        
+
         Args:
             prompt: The input prompt to condition generation
-            
+
         Returns:
             Generated boolean value
         """
         self.debug("[generate_boolean]", prompt, is_prompt=True)
-        
+
         if hasattr(self.model_backend, "tokenizer"):
             input_tensor = self.model_backend.tokenizer.encode(prompt, return_tensors="pt")
             output = self.model_backend.model.forward(input_tensor.to(self.model_backend.model.device))
@@ -231,17 +249,17 @@ class TypeGenerator:
 
     def generate_string(self, prompt: str, maxLength=None) -> str:
         """Generate a string value from the model.
-        
+
         Args:
             prompt: The input prompt to condition generation
             maxLength: Optional maximum length constraint for the string
-            
+
         Returns:
             Generated string value
         """
         prompt = prompt + '"'
         self.debug("[generate_string]", prompt, is_prompt=True)
-        
+
         def string_post_process(response: str) -> str:
             if response.count('"') < 1:
                 return response
@@ -275,15 +293,15 @@ class TypeGenerator:
 
     def generate_p_enum(self, prompt: str, values: list, round: int) -> str:
         """Generate a probabilistic enumeration from possible values.
-        
+
         Args:
             prompt: The input prompt to condition generation
             values: List of possible values to choose from
             round: Number of significant figures for probability rounding
-            
+
         Returns:
             List of dictionaries with choices and their probabilities
-            
+
         Raises:
             NotImplementedError: If model backend doesn't support tokenization.
             Includes installation instructions for compatible backends.
@@ -354,28 +372,28 @@ class TypeGenerator:
         )
 
     def choose_type(
-        self, 
+        self,
         prompt: str,
         possible_types: List[str]
     ) -> str:
         """Select the most likely type to generate based on model probabilities.
-        
+
         For backends with tokenizers: Uses model logits to select the most probable type.
         For other backends: Uses weighted random selection based on type frequency.
-        
+
         Args:
             prompt: The input prompt to condition generation
             possible_types: List of possible schema types to choose from
-            
+
         Returns:
             The selected type name
-            
+
         Raises:
             ValueError: If no valid type can be chosen or types are unsupported
         """
         possible_types = list(set(possible_types))  # remove duplicates
         self.debug("[choose_type]", str(possible_types))
-        
+
         if len(possible_types) < 1:
             raise ValueError("Union type must not be empty")
         elif len(possible_types) == 1:
@@ -402,7 +420,7 @@ class TypeGenerator:
         # Original tokenizer-based implementation
         try:
             input_tensor = self.model_backend.tokenizer.encode(
-                prompt, 
+                prompt,
                 return_tensors="pt"
             )
             output = self.model_backend.model.forward(
@@ -424,7 +442,7 @@ class TypeGenerator:
 
             if max_type is None:
                 raise ValueError("Unable to determine type to generate")
-                
+
             self.debug("[choose_type]", max_type)
             return max_type
         except Exception as e:
@@ -435,13 +453,13 @@ class TypeGenerator:
         self, prompt: str, range_min: float, range_max: float, round: int
     ) -> float:
         """Generate a probabilistic integer within a specified range.
-        
+
         Args:
             prompt: The input prompt to condition generation
             range_min: Minimum value of the range (inclusive)
             range_max: Maximum value of the range (inclusive)
             round: Number of significant figures for probability rounding
-            
+
         Returns:
             Weighted average of possible integers based on their probabilities
         """
