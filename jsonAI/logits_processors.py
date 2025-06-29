@@ -42,48 +42,27 @@ class StringStoppingCriteria(StoppingCriteria):
 
 class NumberStoppingCriteria(StoppingCriteria):
     def __init__(
-        self,
-        tokenizer: PreTrainedTokenizer,
-        prompt_length: int,
-        precision: int = 3,
+        self, tokenizer: PreTrainedTokenizer, prompt_length: int, precision: int = 3
     ):
+        """Initialize NumberStoppingCriteria with precision handling."""
         self.tokenizer = tokenizer
-        self.precision = precision
         self.prompt_length = prompt_length
+        self.precision = precision
 
-    def __call__(
-        self,
-        input_ids: torch.LongTensor,
-        scores: torch.FloatTensor,
-    ) -> bool:
-        decoded = self.tokenizer.decode(
-            input_ids[0][self.prompt_length:], skip_special_tokens=True
-        )
+    def __call__(self, input_ids: torch.LongTensor, _) -> bool:
+        """Stop generation based on precision and prompt length."""
+        if len(input_ids[0]) <= self.prompt_length:
+            return False
 
-        if decoded.count(".") > 1:
-            return True
+        gen_ids = input_ids[0][self.prompt_length:]
+        generated_text = self.tokenizer.decode(gen_ids, skip_special_tokens=True)
 
-        if (
-            decoded.count(".") == 1
-            and len(decoded.replace(" ", "").split(".")[1]) > self.precision
-        ):
-            return True
-
-        if (
-            len(decoded) > 1
-            and "," in decoded
-            and any(c.isdigit() for c in decoded.split(",")[0])
-        ):
-            return True
-
-        if (
-            len(decoded) > 1
-            and any(c.isdigit() for c in decoded)
-            and ("," in decoded or decoded[-1] in (" ", "\n"))
-        ):
-            return True
-
-        return False
+        try:
+            number = float(generated_text)
+            rounded_number = round(number, self.precision)
+            return len(str(rounded_number)) > self.precision
+        except ValueError:
+            return False
 
 
 class OutputNumbersTokens(LogitsWarper):

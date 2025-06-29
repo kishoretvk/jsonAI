@@ -72,39 +72,14 @@ class Jsonformer:
             obj[key] = self.generate_value(schema, obj, key)
         return obj
 
-    def generate_array(
-        self, 
-        item_schema: Dict[str, Any], 
-        obj: List[Any]
-    ) -> list:
+    async def generate_array(self, item_schema: Dict[str, Any], obj: List[Any]) -> list:
         """Generate an array following the item schema.
         
         Uses TypeGenerator's helper methods when possible for consistent behavior.
         """
-        for _ in range(self.max_array_length):
-            # Generate array element
-            element = self.generate_value(item_schema, obj)
-            obj[-1] = element
-
-            # Check if we should continue the array
-            obj.append(self.generation_marker)
-            input_prompt = self.get_prompt()
-            obj.pop()
-            
-            if hasattr(self.type_generator, '_generate_with_processor'):
-                # Use TypeGenerator's standardized approach
-                should_continue = self.type_generator._generate_with_processor(
-                    prompt=input_prompt,
-                    max_tokens=1,
-                    post_process=lambda x: "," in x and "]" not in x
-                )
-                if not should_continue:
-                    break
-            else:
-                # Fallback to original behavior if helper method isn't available
-                break
-
-        return obj
+        tasks = [self.generate_value(item_schema, obj) for _ in range(self.max_array_length)]
+        results = await asyncio.gather(*tasks)
+        return results
 
     def choose_type_to_generate(self, possible_types: List[str]) -> str:
         """Select which type to generate from possible options.
@@ -116,6 +91,7 @@ class Jsonformer:
             possible_types=possible_types
         )
 
+    # Refactor generate_value to modularize schema type handling
     def generate_value(
         self,
         schema: Dict[str, Any],
@@ -132,102 +108,30 @@ class Jsonformer:
 
         prompt = self.get_prompt()
 
-        if schema_type == "number":
+        type_handlers = {
+            "number": self.type_generator.generate_number,
+            "integer": self.type_generator.generate_integer,
+            "boolean": self.type_generator.generate_boolean,
+            "string": lambda p: self.type_generator.generate_string(p, schema.get("maxLength")),
+            "datetime": self.type_generator.generate_datetime,
+            "date": self.type_generator.generate_date,
+            "time": self.type_generator.generate_time,
+            "uuid": self.type_generator.generate_uuid,
+            "binary": self.type_generator.generate_binary,
+            "p_enum": lambda p: self.type_generator.generate_p_enum(p, schema["values"], round=schema.get("round", 3)),
+            "p_integer": lambda p: self.type_generator.generate_p_integer(p, schema["minimum"], schema["maximum"], round=schema.get("round", 3)),
+            "enum": lambda p: self.type_generator.generate_enum(p, set(schema["values"])),
+            "array": lambda _: self.generate_array(schema["items"], obj[key]),
+            "object": lambda _: self.generate_object(schema["properties"], obj[key]),
+            "null": lambda _: None,
+        }
+
+        if schema_type in type_handlers:
             if key:
                 obj[key] = self.generation_marker
             else:
                 obj.append(self.generation_marker)
-            return self.type_generator.generate_number(prompt)
-        elif schema_type == "integer":
-            if key:
-                obj[key] = self.generation_marker
-            else:
-                obj.append(self.generation_marker)
-            return self.type_generator.generate_integer(prompt)
-        elif schema_type == "boolean":
-            if key:
-                obj[key] = self.generation_marker
-            else:
-                obj.append(self.generation_marker)
-            return self.type_generator.generate_boolean(prompt)
-        elif schema_type == "string":
-            if key:
-                obj[key] = self.generation_marker
-            else:
-                obj.append(self.generation_marker)
-            return self.type_generator.generate_string(
-                prompt, schema.get("maxLength")
-            )
-        elif schema_type == "datetime":
-            if key:
-                obj[key] = self.generation_marker
-            else:
-                obj.append(self.generation_marker)
-            return self.type_generator.generate_datetime(prompt)
-        elif schema_type == "date":
-            if key:
-                obj[key] = self.generation_marker
-            else:
-                obj.append(self.generation_marker)
-            return self.type_generator.generate_date(prompt)
-        elif schema_type == "time":
-            if key:
-                obj[key] = self.generation_marker
-            else:
-                obj.append(self.generation_marker)
-            return self.type_generator.generate_time(prompt)
-        elif schema_type == "uuid":
-            if key:
-                obj[key] = self.generation_marker
-            else:
-                obj.append(self.generation_marker)
-            return self.type_generator.generate_uuid(prompt)
-        elif schema_type == "binary":
-            if key:
-                obj[key] = self.generation_marker
-            else:
-                obj.append(self.generation_marker)
-            return self.type_generator.generate_binary(prompt)
-        elif schema_type == "p_enum":
-            if key:
-                obj[key] = self.generation_marker
-            else:
-                obj.append(self.generation_marker)
-            return self.type_generator.generate_p_enum(
-                prompt, schema["values"], round=schema.get("round", 3)
-            )
-        elif schema_type == "p_integer":
-            if key:
-                obj[key] = self.generation_marker
-            else:
-                obj.append(self.generation_marker)
-            return self.type_generator.generate_p_integer(
-                prompt,
-                schema["minimum"],
-                schema["maximum"],
-                round=schema.get("round", 3),
-            )
-        elif schema_type == "enum":
-            if key:
-                obj[key] = self.generation_marker
-            else:
-                obj.append(self.generation_marker)
-            return self.type_generator.generate_enum(
-                prompt, set(schema["values"])
-            )
-        elif schema_type == "array":
-            new_array = []
-            obj[key] = new_array
-            return self.generate_array(schema["items"], new_array)
-        elif schema_type == "object":
-            new_obj = {}
-            if key:
-                obj[key] = new_obj
-            else:
-                obj.append(new_obj)
-            return self.generate_object(schema["properties"], new_obj)
-        elif schema_type == "null":
-            return None
+            return type_handlers[schema_type](prompt)
         else:
             raise ValueError(f"Unsupported schema type: {schema_type}")
 

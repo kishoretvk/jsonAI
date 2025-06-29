@@ -10,6 +10,15 @@ import asyncio
 def cli():
     pass
 
+def initialize_backend(use_ollama, model, ollama_model):
+    """Initialize the backend based on user options."""
+    if use_ollama:
+        return OllamaBackend(model_name=ollama_model)
+    else:
+        tokenizer = AutoTokenizer.from_pretrained(model)
+        model = AutoModelForCausalLM.from_pretrained(model)
+        return TransformersBackend(model, tokenizer)
+
 @cli.command()
 @click.option("--schema", type=click.File('r'), required=True, help="JSON schema file")
 @click.option("--prompt", required=True, help="Generation prompt")
@@ -20,33 +29,27 @@ def cli():
 @click.option("--async", "use_async", is_flag=True, help="Use async generation")
 def generate(schema, prompt, model, use_ollama, ollama_model, output_format, use_async):
     """Generate structured data from a schema and prompt"""
-    json_schema = json.load(schema)
-    
-    if use_ollama:
-        backend = OllamaBackend(model_name=ollama_model)
-    else:
-        tokenizer = AutoTokenizer.from_pretrained(model)
-        model = AutoModelForCausalLM.from_pretrained(model)
-        backend = TransformersBackend(model, tokenizer)
-    
+    try:
+        json_schema = json.load(schema)
+    except json.JSONDecodeError:
+        click.echo("Invalid JSON schema file")
+        return
+
+    backend = initialize_backend(use_ollama, model, ollama_model)
+
+    jsonformer = Jsonformer(
+        model_backend=backend,
+        json_schema=json_schema,
+        prompt=prompt,
+        output_format=output_format
+    )
+
     if use_async:
-        jsonformer = Jsonformer(
-            model_backend=backend,
-            json_schema=json_schema,
-            prompt=prompt,
-            output_format=output_format
-        )
         async_jsonformer = AsyncJsonformer(jsonformer)
         result = asyncio.run(async_jsonformer())
     else:
-        jsonformer = Jsonformer(
-            model_backend=backend,
-            json_schema=json_schema,
-            prompt=prompt,
-            output_format=output_format
-        )
         result = jsonformer()
-    
+
     click.echo(result)
 
 @cli.command()

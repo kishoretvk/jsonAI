@@ -11,27 +11,25 @@ class MCPClient:
             self.headers["Authorization"] = f"Bearer {auth_token}"
 
     def call_tool_sync(self, server: str, tool: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Call a tool synchronously with detailed error handling."""
         url = f"{self.base_url}/{server}/{tool}"
-        response = requests.post(
-            url,
-            json=args,
-            headers=self.headers,
-            timeout=self.timeout
-        )
-        response.raise_for_status()
-        return response.json()
+        try:
+            response = requests.post(url, json=args, headers=self.headers, timeout=self.timeout)
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as e:
+            raise ValueError(f"Failed to call tool '{tool}' on server '{server}': {e}")
 
     async def call_tool_async(self, server: str, tool: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Call a tool asynchronously with detailed error handling."""
         url = f"{self.base_url}/{server}/{tool}"
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                url,
-                json=args,
-                headers=self.headers,
-                timeout=self.timeout
-            ) as response:
-                response.raise_for_status()
-                return await response.json()
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=args, headers=self.headers, timeout=self.timeout) as response:
+                    response.raise_for_status()
+                    return await response.json()
+        except aiohttp.ClientError as e:
+            raise ValueError(f"Failed to call tool '{tool}' on server '{server}': {e}")
 
     @staticmethod
     def create_default_client() -> 'MCPClient':

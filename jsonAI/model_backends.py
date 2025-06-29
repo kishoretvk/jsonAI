@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from transformers import PreTrainedModel, PreTrainedTokenizer
+import asyncio
 
 class ModelBackend(ABC):
     @abstractmethod
@@ -17,12 +18,13 @@ class TransformersBackend(ModelBackend):
         self.tokenizer = tokenizer
     
     def generate(self, prompt: str, **kwargs) -> str:
-        input_tokens = self.tokenizer.encode(prompt, return_tensors="pt").to(self.model.device)
-        response = self.model.generate(
-            input_tokens,
-            **kwargs
-        )
-        return self.tokenizer.decode(response[0], skip_special_tokens=True)
+        """Generate text with detailed error handling."""
+        try:
+            input_tokens = self.tokenizer.encode(prompt, return_tensors="pt").to(self.model.device)
+            response = self.model.generate(input_tokens, **kwargs)
+            return self.tokenizer.decode(response[0], skip_special_tokens=True)
+        except Exception as e:
+            raise ValueError(f"Failed to generate text: {e}")
 
 class OllamaBackend(ModelBackend):
     def __init__(self, model_name: str, host: str = "http://localhost:11434"):
@@ -39,12 +41,15 @@ class OllamaBackend(ModelBackend):
         return response['response']
 
     async def agenerate(self, prompt: str, **kwargs) -> str:
-        """Async implementation for Ollama"""
-        import ollama
-        response = await ollama.AsyncClient(host=self.host).generate(
-            model=self.model_name, 
-            prompt=prompt, 
-            stream=False, 
-            options=kwargs
-        )
-        return response['response']
+        """Async implementation for Ollama with error handling."""
+        try:
+            import ollama
+            response = await ollama.AsyncClient(host=self.host).generate(
+                model=self.model_name, 
+                prompt=prompt, 
+                stream=False, 
+                options=kwargs
+            )
+            return response['response']
+        except Exception as e:
+            raise ValueError(f"Failed to generate text asynchronously: {e}")
