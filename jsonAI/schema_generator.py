@@ -1,6 +1,7 @@
 from typing import Dict, Any
 import json
 from jsonAI.model_backends import ModelBackend
+from jsonschema import validate as jsonschema_validate, ValidationError
 
 class SchemaGenerator:
     """
@@ -68,3 +69,23 @@ class SchemaGenerator:
         elif '```' in response:
             response = response.split('```')[1].split('```')[0]
         return response.strip()
+
+    def validate(self, schema: Dict[str, Any], data: Any) -> bool:
+        """
+        Validate data against a JSON schema.
+
+        Args:
+            schema (Dict[str, Any]): The JSON schema to validate against.
+            data (Any): The data to validate.
+
+        Returns:
+            bool: True if the data is valid, False otherwise.
+
+        Raises:
+            ValidationError: If the data does not conform to the schema.
+        """
+        try:
+            jsonschema_validate(instance=data, schema=schema)
+            return True
+        except ValidationError as e:
+            return False

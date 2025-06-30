@@ -39,11 +39,14 @@ jobs:
       run: poetry run pylint jsonAI
 
     - name: Test with pytest and Coverage
-      run: poetry run pytest jsonAI --cov=jsonAI --cov-report=xml
+      run: poetry run pytest jsonAI tests --cov=jsonAI --cov-report=xml
 
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        files: ./coverage.xml
-        fail_ci_if_error: true
+    - name: Run Integration Tests
+      run: poetry run pytest examples --cov=jsonAI --cov-report=xml
+
+    - name: Generate Local Coverage Report
+      run: poetry run coverage report
+
+    - name: Handle Test Failures
+      if: failure()
+      run: echo "Tests failed. Please review the logs."

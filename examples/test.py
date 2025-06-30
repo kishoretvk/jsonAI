@@ -83,53 +83,83 @@ examples = [
         "prompt": "Generate a person's profile.",
     },
     {
-        "description": "JSON Generation with Array",
+        "description": "YAML Generation",
         "schema": {
             "type": "object",
             "properties": {
-                "items": {
-                    "type": "array",
-                    "items": {"type": "string"}
-                }
+                "name": {"type": "string"},
+                "age": {"type": "integer"}
             }
         },
-        "prompt": "Generate a list of fruits.",
+        "prompt": "Generate a person's profile in YAML.",
+        "output_format": "yaml",
     },
     {
-        "description": "XML Generation",
+        "description": "CSV Generation",
         "schema": {
-            "type": "object",
-            "properties": {
-                "book": {
-                    "type": "object",
-                    "properties": {
-                        "title": {"type": "string"},
-                        "author": {"type": "string"},
-                        "year": {"type": "integer"}
-                    }
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "age": {"type": "integer"}
                 }
             }
         },
-        "prompt": "Generate details for a book.",
-        "output_format": "xml",
+        "prompt": "Generate a list of people in CSV.",
+        "output_format": "csv",
     },
+    {
+        "description": "Advanced Schema with oneOf",
+        "schema": {
+            "oneOf": [
+                {"type": "string"},
+                {"type": "integer"}
+            ]
+        },
+        "prompt": "Generate a value that can be either a string or an integer.",
+    },
+    {
+        "description": "Custom Format: Email",
+        "schema": {
+            "type": "string",
+            "format": "email"
+        },
+        "prompt": "Generate a valid email address.",
+    },
+    {
+        "description": "Streaming JSON Generation",
+        "schema": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "age": {"type": "integer"}
+            }
+        },
+        "prompt": "Stream a person's profile.",
+    }
 ]
 
 for example in examples:
     print(f"\n--- {example['description']} ---")
-    try:
-        output = generate_json(
-            model=model,
-            tokenizer=tokenizer,
-            json_schema=example["schema"],
-            prompt=example["prompt"],
-            debug_mode=DEBUG_MODE,
-            output_format=example.get("output_format", "json")
-        )
-        print("Generated Output:")
-        print(json.dumps(output, indent=2) if isinstance(output, dict) else output)
-    except Exception as e:
-        print(f"Error in {example['description']}: {e}")
+    if example['description'] == "Streaming JSON Generation":
+        jsonformer = Jsonformer(model, tokenizer, example['schema'], example['prompt'], debug_mode=DEBUG_MODE)
+        for chunk in jsonformer.stream_generate_data():
+            print("Generated Chunk:", chunk)
+    else:
+        try:
+            output = generate_json(
+                model=model,
+                tokenizer=tokenizer,
+                json_schema=example["schema"],
+                prompt=example["prompt"],
+                debug_mode=DEBUG_MODE,
+                output_format=example.get("output_format", "json")
+            )
+            print("Generated Output:")
+            print(json.dumps(output, indent=2) if isinstance(output, dict) else output)
+        except Exception as e:
+            print(f"Error in {example['description']}: {e}")
 
 # --- Instructions ---
 print("\n--- Instructions ---")

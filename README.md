@@ -1,4 +1,3 @@
-
 # jsonAI
 
 ## Table of Contents
@@ -272,3 +271,24 @@ See the [examples/](examples/) directory for more advanced usage and integration
 ## License
 
 This project is licensed under the MIT License.
+
+## Streaming Support
+
+jsonAI now supports streaming data generation for real-time applications. Use the `stream_generate_data` method in `Jsonformer` or `AsyncJsonformer` to generate data incrementally.
+
+### Example
+
+```python
+# Streaming with Jsonformer
+jsonformer = Jsonformer(model_backend, json_schema, prompt)
+for data_chunk in jsonformer.stream_generate_data():
+    print(data_chunk)
+
+# Streaming with AsyncJsonformer
+async def async_stream():
+    async_jsonformer = AsyncJsonformer(jsonformer)
+    async for data_chunk in async_jsonformer.stream_generate_data():
+        print(data_chunk)
+
+asyncio.run(async_stream())
+```

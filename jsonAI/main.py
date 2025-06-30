@@ -2,6 +2,7 @@ from typing import List, Union, Dict, Any, Callable, Optional
 import asyncio
 from termcolor import cprint
 import json
+import traceback
 
 from jsonAI.model_backends import ModelBackend
 from jsonAI.type_generator import TypeGenerator
@@ -16,6 +17,14 @@ GENERATION_MARKER = "|GENERATION|"
 
 class Jsonformer:
     value: Dict[str, Any] = {}
+
+    def __setattr__(self, name, value):
+        super().__setattr__(name, value)
+        if name in ['tool_registry', 'mcp_callback'] and hasattr(self, 'debug_on'):
+            self.debug(f"[__setattr__] Attribute '{name}' modified", str(value))
+            self.debug(f"[__setattr__] Attribute '{name}' type", str(type(value)))
+            import traceback
+            self.debug(f"[__setattr__] Stack trace for '{name}' modification", traceback.format_stack())
 
     def __init__(
         self,
@@ -38,13 +47,16 @@ class Jsonformer:
         self.prompt = prompt
         self.output_format = output_format
         self.validate_output = validate_output
-        self.tool_registry = tool_registry
-        self.mcp_callback = mcp_callback
+        self.tool_registry = tool_registry if isinstance(tool_registry, ToolRegistry) else None
+        self.mcp_callback = mcp_callback if callable(mcp_callback) else None
         self.debug_on = debug
+
+        self.debug("[__init__] Initialized tool_registry", str(self.tool_registry))
+        self.debug("[__init__] Initialized mcp_callback", str(self.mcp_callback))
 
         self.type_generator = TypeGenerator(
             model_backend=self.model_backend,
-            debug=self.debug_on,
+            debug=self.debug,
             max_number_tokens=max_number_tokens,
             max_string_token_length=max_string_token_length,
             temperature=temperature,
@@ -54,6 +66,11 @@ class Jsonformer:
 
         self.generation_marker = "|GENERATION|"
         self.max_array_length = max_array_length
+
+        self.debug("[__init__] tool_registry.get_tool type", str(type(self.tool_registry.get_tool)))
+        self.debug("[__init__] mcp_callback type", str(type(self.mcp_callback)))
+        self.debug("[__init__] tool_registry.get_tool value", str(self.tool_registry.get_tool))
+        self.debug("[__init__] mcp_callback value", str(self.mcp_callback))
 
     def debug(self, caller: str, value: str, is_prompt: bool = False):
         if self.debug_on:
@@ -68,8 +85,9 @@ class Jsonformer:
         self, properties: Dict[str, Any], obj: Dict[str, Any]
     ) -> Dict[str, Any]:
         for key, schema in properties.items():
-            self.debug("[generate_object] generating value for", key)
+            self.debug("[generate_object] Generating value for key", key)
             obj[key] = self.generate_value(schema, obj, key)
+            self.debug("[generate_object] Updated object", str(obj))
         return obj
 
     async def generate_array(self, item_schema: Dict[str, Any], obj: List[Any]) -> list:
@@ -98,30 +116,22 @@ class Jsonformer:
         obj: Union[Dict[str, Any], List[Any]],
         key: Union[str, None] = None,
     ) -> Any:
-        # --- Advanced JSON Schema combinators ---
-        if 'oneOf' in schema:
-            # For now, select the first schema; can be improved with LLM or user hint
-            chosen_schema = schema['oneOf'][0]
-            return self.generate_value(chosen_schema, obj, key)
-        elif 'anyOf' in schema:
-            chosen_schema = schema['anyOf'][0]
-            return self.generate_value(chosen_schema, obj, key)
-        elif 'allOf' in schema:
-            merged_schema = self.merge_schemas(schema['allOf'])
-            return self.generate_value(merged_schema, obj, key)
-        # --- Custom format support ---
-        if 'format' in schema and hasattr(self, 'format_registry'):
-            handler = self.format_registry.get(schema['format'])
-            if handler:
-                return handler(schema)
-        # --- Existing type handling ---
         schema_type = schema["type"]
+        self.debug("[generate_value] Schema type", schema_type)
         if isinstance(schema_type, list):
             if key:
                 obj[key] = self.generation_marker
             else:
                 obj.append(self.generation_marker)
             schema_type = self.choose_type_to_generate(schema_type)
+
+        # Ensure generation marker is added for primitive types
+        if schema_type in ["string", "number", "integer", "boolean", "datetime", "date", "time", "uuid", "binary", "p_enum", "p_integer", "enum", "null"]:
+            if key:
+                obj[key] = self.generation_marker
+            else:
+                obj.append(self.generation_marker)
+            self.debug("[generate_value] Added generation marker", str(obj))
 
         prompt = self.get_prompt()
 
@@ -144,28 +154,9 @@ class Jsonformer:
         }
 
         if schema_type in type_handlers:
-            if key:
-                obj[key] = self.generation_marker
-            else:
-                obj.append(self.generation_marker)
             return type_handlers[schema_type](prompt)
         else:
             raise ValueError(f"Unsupported schema type: {schema_type}")
-
-    def merge_schemas(self, schemas: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Merge multiple schemas for allOf support (simple deep merge)."""
-        merged = {}
-        for s in schemas:
-            merged = self.deep_merge(merged, s)
-        return merged
-
-    def deep_merge(self, a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
-        for k, v in b.items():
-            if k in a and isinstance(a[k], dict) and isinstance(v, dict):
-                a[k] = self.deep_merge(a[k], v)
-            else:
-                a[k] = v
-        return a
 
     def get_prompt(self):
         template = """{prompt}
@@ -175,11 +166,15 @@ Result: ```json
 {progress}"""
         value = self.value
 
+        self.debug("[get_prompt] Current self.value", str(value))
         progress = json.dumps(value)
+        self.debug("[get_prompt] Progress string", progress)
+
         gen_marker_index = progress.find(f'"{self.generation_marker}"')
         if gen_marker_index != -1:
             progress = progress[:gen_marker_index]
         else:
+            self.debug("[get_prompt] Generation marker not found", progress)
             raise ValueError("Failed to find generation marker")
 
         prompt = template.format(
@@ -193,52 +188,80 @@ Result: ```json
     def _execute_tool_call(self, generated_data: Dict[str, Any]) -> Dict[str, Any]:
         """Checks for and executes a tool call if defined in the schema."""
         tool_call_config = self.json_schema.get("x-jsonai-tool-call")
-        
+
         if not self.tool_registry or not tool_call_config:
             return {"generated_data": generated_data}
 
-        tool_name = tool_call_config.get("name")
-        tool = self.tool_registry.get_tool(tool_name)
+        try:
+            if not callable(self.tool_registry.get_tool):
+                raise ValueError("tool_registry.get_tool must be callable")
+            if not callable(self.mcp_callback):
+                raise ValueError("mcp_callback must be callable")
 
-        if not tool:
-            raise ValueError(f"Tool '{tool_name}' not found in the registry.")
+            self.debug("[_execute_tool_call] tool_registry.get_tool type", str(type(self.tool_registry.get_tool)))
+            self.debug("[_execute_tool_call] mcp_callback type", str(type(self.mcp_callback)))
+            self.debug("[_execute_tool_call] tool_registry.get_tool value", str(self.tool_registry.get_tool))
+            self.debug("[_execute_tool_call] mcp_callback value", str(self.mcp_callback))
+            self.debug("[_execute_tool_call] tool_registry.get_tool callable before access", str(callable(self.tool_registry.get_tool)))
+            self.debug("[_execute_tool_call] mcp_callback callable before access", str(callable(self.mcp_callback)))
 
-        # Map generated data to tool arguments
-        arg_map = tool_call_config.get("arguments", {})
-        kwargs = {
-            tool_arg: generated_data.get(json_key)
-            for tool_arg, json_key in arg_map.items()
-        }
+            tool_name = tool_call_config.get("name")
+            tool = self.tool_registry.get_tool(tool_name) if callable(self.tool_registry.get_tool) else None
 
-        # Execute the tool
-        if callable(tool): # It's a Python function
-            tool_result = tool(**kwargs)
-        else: # It's an MCP tool
-            if not self.mcp_callback:
-                raise ValueError("mcp_callback must be provided to execute MCP tools.")
-            # Invoke the callback provided by the environment
-            tool_result = self.mcp_callback(tool_name, tool['server_name'], kwargs)
-            
-        return {
-            "generated_data": generated_data,
-            "tool_name": tool_name,
-            "tool_arguments": kwargs,
-            "tool_result": tool_result
-        }
+            self.debug("[_execute_tool_call] tool_registry after access", str(self.tool_registry))
+            self.debug("[_execute_tool_call] tool_registry.get_tool callable after access", str(callable(self.tool_registry.get_tool)))
+            self.debug("[_execute_tool_call] mcp_callback callable after access", str(callable(self.mcp_callback)))
+
+            if not tool:
+                raise ValueError(f"Tool '{tool_name}' not found in the registry.")
+
+            # Map generated data to tool arguments
+            arg_map = tool_call_config.get("arguments", {})
+            kwargs = {
+                tool_arg: generated_data.get(json_key)
+                for tool_arg, json_key in arg_map.items()
+            }
+
+            # Execute the tool
+            if callable(tool):  # It's a Python function
+                tool_result = tool(**kwargs)
+            else:  # It's an MCP tool
+                if not callable(self.mcp_callback):
+                    raise ValueError("mcp_callback must be callable to execute MCP tools.")
+                # Invoke the callback provided by the environment
+                tool_result = self.mcp_callback(tool_name, tool['server_name'], kwargs)
+
+            return {
+                "generated_data": generated_data,
+                "tool_name": tool_name,
+                "tool_arguments": kwargs,
+                "tool_result": tool_result
+            }
+        except Exception as e:
+            self.debug("[_execute_tool_call] Exception occurred", str(e))
+            self.debug("[_execute_tool_call] Stack trace", traceback.format_exc())
+            raise
 
     def generate_data(self) -> Dict[str, Any]:
         """Generate structured data without tool execution"""
         self.value = {}
-        generated_data = self.generate_object(
-            self.json_schema["properties"], self.value
-        )
-        
-        # Validate if enabled
-        if self.validate_output and self.schema_validator:
-            self.schema_validator.validate(generated_data, self.json_schema)
-            
-        return generated_data
+        self.debug("[generate_data] Initialized self.value", str(self.value))
 
+        try:
+            generated_data = self.generate_object(
+                self.json_schema["properties"], self.value
+            )
+            self.debug("[generate_data] Generated data", str(generated_data))
+
+            # Validate if enabled
+            if self.validate_output and self.schema_validator:
+                self.schema_validator.validate(generated_data, self.json_schema)
+
+            return generated_data
+        except Exception as e:
+            self.debug("[generate_data] Exception occurred", str(e))
+            self.debug("[generate_data] Stack trace", traceback.format_exc())
+            raise
     def __call__(self) -> Union[Dict[str, Any], str]:
         generated_data = self.generate_data()
         
