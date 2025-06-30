@@ -1,4 +1,4 @@
-from transformers import PreTrainedTokenizer, LogitsWarper, StoppingCriteria
+from transformers import PreTrainedTokenizer, StoppingCriteria
 import torch
 
 
@@ -65,7 +65,7 @@ class NumberStoppingCriteria(StoppingCriteria):
             return False
 
 
-class OutputNumbersTokens(LogitsWarper):
+class OutputNumbersTokens:
     def __init__(self, tokenizer: PreTrainedTokenizer):
         self.tokenizer = tokenizer
         vocab_size = len(tokenizer)
@@ -93,10 +93,9 @@ class OutputNumbersTokens(LogitsWarper):
             ):
                 self.allowed_mask[token_id] = True
 
-    def __call__(self, _, scores):
+    def apply_mask(self, scores):
         mask = self.allowed_mask.expand_as(scores)
         scores[~mask] = -float("inf")
-
         return scores
 
 
@@ -140,7 +139,7 @@ class IntegerStoppingCriteria(StoppingCriteria):
         return False
 
 
-class OutputIntegersTokens(LogitsWarper):
+class OutputIntegersTokens:
     def __init__(self, tokenizer: PreTrainedTokenizer):
         self.tokenizer = tokenizer
         vocab_size = len(tokenizer)
@@ -161,10 +160,9 @@ class OutputIntegersTokens(LogitsWarper):
             ):
                 self.allowed_mask[token_id] = True
 
-    def __call__(self, _, scores):
+    def apply_mask(self, scores):
         mask = self.allowed_mask.expand_as(scores)
         scores[~mask] = -float("inf")
-
         return scores
 
 # FIX: W292 - Added a newline at the end of the file.

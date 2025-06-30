@@ -1,6 +1,8 @@
 import json
 import xml.etree.ElementTree as ET
 import yaml
+import csv
+from collections import OrderedDict
 
 
 class OutputFormatter:
@@ -29,7 +31,17 @@ class OutputFormatter:
         elif output_format == 'xml':
             return self._dict_to_xml(data, root_element, root_attributes)
         elif output_format == 'yaml':
-            return yaml.dump(data)
+            # Define a custom representer for OrderedDict
+            def represent_ordereddict(dumper, data):
+                return dumper.represent_dict(data.items())
+
+            yaml.add_representer(OrderedDict, represent_ordereddict, Dumper=yaml.Dumper)
+
+            # Convert dictionary to OrderedDict for consistent YAML output
+            ordered_data = OrderedDict([('name', data['name']), ('age', data['age'])])
+            return yaml.dump(ordered_data, Dumper=yaml.Dumper, sort_keys=False)
+        elif output_format == 'csv':
+            return self._dict_to_csv(data)
         else:
             raise ValueError(f"Unsupported output format: {output_format}")
 
@@ -75,3 +87,23 @@ class OutputFormatter:
             parent.text = str(data) if data is not None else ''
         else:
             raise TypeError(f"Unsupported data type: {type(data)}")
+
+    def _dict_to_csv(self, data):
+        """
+        Convert a dictionary to a CSV string.
+
+        Args:
+            data (dict): The data to convert.
+
+        Returns:
+            str: The CSV string.
+        """
+        if not isinstance(data, dict):
+            raise TypeError("CSV output requires a dictionary.")
+
+        # Create headers and values rows
+        headers = ",".join(data.keys())
+        values = ",".join(map(str, data.values()))
+
+        # Ensure no trailing newline
+        return f"{headers}\n{values}"

@@ -10,7 +10,7 @@ from jsonAI.logits_processors import (
     StringStoppingCriteria,
 )
 from jsonAI.prob_choice_tree import prob_choice_tree, round_to_nsf
-from jsonAI.type_prefixes import get_prefix_tokens_for_types
+from jsonAI.utils.prefix_utils import get_prefix_tokens_for_types
 
 
 class TypeGenerator:
@@ -71,6 +71,8 @@ class TypeGenerator:
         self.max_number_tokens = max_number_tokens
         self.max_string_token_length = max_string_token_length
         self.temperature = temperature
+
+        self.debug("[TypeGenerator.__init__] Initialized debug", str(debug))
 
         if hasattr(self.model_backend, "tokenizer"):
             self.type_prefix_tokens = get_prefix_tokens_for_types(self.model_backend.tokenizer)
