@@ -15,6 +15,7 @@
   - [Tool Calling Example](#tool-calling-example)
   - [MCP Integration Example](#mcp-integration-example)
   - [Complex Schema Example](#complex-schema-example)
+  - [Tool Chaining Example](#tool-chaining-example)
 - [Output Format × Type Coverage](#output-format--type-coverage)
 - [Integrations & Capabilities](#integrations--capabilities)
 - [License](#license)
@@ -231,6 +232,58 @@ prompt = "Generate details for a book."
 jsonformer = Jsonformer(model, tokenizer, schema, prompt, output_format="xml")
 output = jsonformer()
 print(output)
+```
+
+### Tool Chaining Example
+
+You can chain multiple tools together using the `x-jsonai-tool-chain` schema key. Each tool in the chain receives arguments from the generated data and/or previous tool outputs.
+
+```python
+from jsonAI.main import Jsonformer
+from jsonAI.tool_registry import ToolRegistry
+
+def add(x, y):
+    return {"sum": x + y}
+
+def multiply(sum, factor):
+    return {"product": sum * factor}
+
+registry = ToolRegistry()
+registry.register_tool("add", add)
+registry.register_tool("multiply", multiply)
+
+schema = {
+    "type": "object",
+    "properties": {
+        "x": {"type": "integer"},
+        "y": {"type": "integer"},
+        "factor": {"type": "integer"}
+    },
+    "x-jsonai-tool-chain": [
+        {
+            "name": "add",
+            "arguments": {"x": "x", "y": "y"}
+        },
+        {
+            "name": "multiply",
+            "arguments": {"sum": "sum", "factor": "factor"}
+        }
+    ]
+}
+
+prompt = "Calculate (x + y) * factor."
+jsonformer = Jsonformer(
+    model_backend=None,  # Not used in this example
+    json_schema=schema,
+    prompt=prompt,
+    tool_registry=registry
+)
+# Provide input data (simulate generated data)
+jsonformer.value = {"x": 2, "y": 3, "factor": 4}
+generated = jsonformer.generate_data()
+result = jsonformer._execute_tool_call(generated)
+print(result)
+# Output will include all intermediate and final tool results.
 ```
 
 ## Output Format × Type Coverage

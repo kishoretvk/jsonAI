@@ -121,13 +121,21 @@ class TypeGenerator:
         )
 
         try:
-            response = self.model_backend.model.generate(
-                input_tokens,
-                max_length=max_tokens,
+            # Use max_new_tokens for HuggingFace/Transformers models if available
+            generate_args = dict(
+                input_ids=input_tokens,
                 temperature=temperature or self.temperature,
                 logits_processor=logits_processor,
                 stopping_criteria=stopping_criteria,
             )
+            model = self.model_backend.model
+            # Check for HuggingFace/Transformers generate signature
+            if hasattr(model, "generate"):
+                # Prefer max_new_tokens if possible
+                generate_args["max_new_tokens"] = max_tokens
+            else:
+                generate_args["max_length"] = max_tokens
+            response = model.generate(**generate_args)
             generated_text = self.model_backend.tokenizer.decode(response[0], skip_special_tokens=True)
             return post_process(generated_text) if post_process else generated_text
         except Exception as e:

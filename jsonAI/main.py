@@ -39,7 +39,7 @@ class Jsonformer:
         max_number_tokens: int = 6,
         temperature: float = 1.0,
         max_string_token_length: int = 175,
-        tool_registry: Optional[ToolRegistry] = None,
+        tool_registry: Optional[object] = None,
         mcp_callback: Optional[Callable] = None,
     ):
         self.model_backend = model_backend
@@ -47,8 +47,8 @@ class Jsonformer:
         self.prompt = prompt
         self.output_format = output_format
         self.validate_output = validate_output
-        self.tool_registry = tool_registry if isinstance(tool_registry, ToolRegistry) else None
-        self.mcp_callback = mcp_callback if callable(mcp_callback) else None
+        self.tool_registry = tool_registry
+        self.mcp_callback = mcp_callback
         self.debug_on = debug
 
         self.debug("[__init__] Initialized tool_registry", str(self.tool_registry))
@@ -67,9 +67,10 @@ class Jsonformer:
         self.generation_marker = "|GENERATION|"
         self.max_array_length = max_array_length
 
-        self.debug("[__init__] tool_registry.get_tool type", str(type(self.tool_registry.get_tool)))
+        if self.tool_registry is not None and hasattr(self.tool_registry, "get_tool"):
+            self.debug("[__init__] tool_registry.get_tool type", str(type(self.tool_registry.get_tool)))
+            self.debug("[__init__] tool_registry.get_tool value", str(self.tool_registry.get_tool))
         self.debug("[__init__] mcp_callback type", str(type(self.mcp_callback)))
-        self.debug("[__init__] tool_registry.get_tool value", str(self.tool_registry.get_tool))
         self.debug("[__init__] mcp_callback value", str(self.mcp_callback))
 
     def debug(self, caller: str, value: str, is_prompt: bool = False):
@@ -186,31 +187,54 @@ Result: ```json
         return prompt
 
     def _execute_tool_call(self, generated_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Checks for and executes a tool call if defined in the schema."""
+        """Checks for and executes a tool call or tool chain if defined in the schema."""
+        # Tool chaining support: check for x-jsonai-tool-chain (list of tool call configs)
+        tool_chain = self.json_schema.get("x-jsonai-tool-chain")
+        if tool_chain and self.tool_registry and hasattr(self.tool_registry, "get_tool"):
+            self.debug("[_execute_tool_call] Detected tool chain", str(tool_chain))
+            chain_results = []
+            current_data = generated_data.copy() if isinstance(generated_data, dict) else dict(generated_data)
+            for idx, tool_call_config in enumerate(tool_chain):
+                tool_name = tool_call_config.get("name")
+                tool = self.tool_registry.get_tool(tool_name) if callable(self.tool_registry.get_tool) else None
+                if not tool:
+                    raise ValueError(f"Tool '{tool_name}' not found in the registry.")
+                arg_map = tool_call_config.get("arguments", {})
+                kwargs = {tool_arg: current_data.get(json_key) for tool_arg, json_key in arg_map.items()}
+                self.debug(f"[_execute_tool_call][chain step {idx}] tool_name", tool_name)
+                self.debug(f"[_execute_tool_call][chain step {idx}] kwargs", str(kwargs))
+                if callable(tool):
+                    tool_result = tool(**kwargs)
+                else:
+                    if not callable(self.mcp_callback):
+                        raise ValueError("mcp_callback must be callable to execute MCP tools.")
+                    tool_result = self.mcp_callback(tool_name, tool['server_name'], kwargs)
+                chain_results.append({
+                    "tool_name": tool_name,
+                    "tool_arguments": kwargs,
+                    "tool_result": tool_result
+                })
+                # For chaining: update current_data with tool_result (if dict), else store as last_result
+                if isinstance(tool_result, dict):
+                    current_data.update(tool_result)
+                else:
+                    current_data[tool_name + "_result"] = tool_result
+            return {
+                "generated_data": generated_data,
+                "tool_chain_results": chain_results,
+                "final_data": current_data
+            }
+
+        # Single tool call (legacy)
         tool_call_config = self.json_schema.get("x-jsonai-tool-call")
-
-        if not self.tool_registry or not tool_call_config:
+        if not self.tool_registry or not tool_call_config or not hasattr(self.tool_registry, "get_tool"):
             return {"generated_data": generated_data}
-
         try:
             if not callable(self.tool_registry.get_tool):
                 raise ValueError("tool_registry.get_tool must be callable")
-            if not callable(self.mcp_callback):
-                raise ValueError("mcp_callback must be callable")
-
-            self.debug("[_execute_tool_call] tool_registry.get_tool type", str(type(self.tool_registry.get_tool)))
-            self.debug("[_execute_tool_call] mcp_callback type", str(type(self.mcp_callback)))
-            self.debug("[_execute_tool_call] tool_registry.get_tool value", str(self.tool_registry.get_tool))
-            self.debug("[_execute_tool_call] mcp_callback value", str(self.mcp_callback))
-            self.debug("[_execute_tool_call] tool_registry.get_tool callable before access", str(callable(self.tool_registry.get_tool)))
-            self.debug("[_execute_tool_call] mcp_callback callable before access", str(callable(self.mcp_callback)))
 
             tool_name = tool_call_config.get("name")
             tool = self.tool_registry.get_tool(tool_name) if callable(self.tool_registry.get_tool) else None
-
-            self.debug("[_execute_tool_call] tool_registry after access", str(self.tool_registry))
-            self.debug("[_execute_tool_call] tool_registry.get_tool callable after access", str(callable(self.tool_registry.get_tool)))
-            self.debug("[_execute_tool_call] mcp_callback callable after access", str(callable(self.mcp_callback)))
 
             if not tool:
                 raise ValueError(f"Tool '{tool_name}' not found in the registry.")

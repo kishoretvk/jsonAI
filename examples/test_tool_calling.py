@@ -40,9 +40,10 @@ def test_tool_calling():
 
     # Test case 1: Valid city
     prompt = "What is the weather like in Tokyo?"
+    from jsonAI.model_backends import TransformersBackend
+    backend = TransformersBackend(model, tokenizer)
     jsonformer = Jsonformer(
-        model=model,
-        tokenizer=tokenizer,
+        model_backend=backend,
         json_schema=weather_schema,
         prompt=prompt,
         tool_registry=registry
@@ -55,8 +56,7 @@ def test_tool_calling():
     # Test case 2: Invalid city
     prompt = "What is the weather like in Mars?"
     jsonformer = Jsonformer(
-        model=model,
-        tokenizer=tokenizer,
+        model_backend=backend,
         json_schema=weather_schema,
         prompt=prompt,
         tool_registry=registry
@@ -69,8 +69,7 @@ def test_tool_calling():
     # Test case 3: No tool registry (should return just generated data)
     prompt = "What is the weather like in Tokyo?"
     jsonformer = Jsonformer(
-        model=model,
-        tokenizer=tokenizer,
+        model_backend=backend,
         json_schema=weather_schema,
         prompt=prompt
     )
