@@ -1,3 +1,6 @@
+
+
+
 from abc import ABC, abstractmethod
 from transformers import PreTrainedModel, PreTrainedTokenizer
 import asyncio
@@ -11,6 +14,7 @@ class ModelBackend(ABC):
         """Async version of generate. Default implementation uses threads."""
         loop = asyncio.get_running_loop()
         # Pass kwargs as a single dictionary argument to generate
+
         return await loop.run_in_executor(None, lambda: self.generate(prompt, **kwargs))
 
 class TransformersBackend(ModelBackend):
@@ -81,4 +85,20 @@ class OpenAIBackend(ModelBackend):
     async def agenerate(self, prompt: str, **kwargs) -> str:
         loop = asyncio.get_running_loop()
         # Pass kwargs as a single dictionary argument to generate
+
         return await loop.run_in_executor(None, lambda: self.generate(prompt, **kwargs))
+
+# DummyBackend for tests and mock generation (define at the end, after all other backends)
+class DummyTokenizer:
+    def __init__(self):
+        self.vocab = {"dummy": 0}
+    def encode(self, text, return_tensors=None):
+        return [0]
+    def decode(self, tokens, skip_special_tokens=True):
+        return "dummy"
+
+class DummyBackend(ModelBackend):
+    def __init__(self):
+        self.tokenizer = DummyTokenizer()
+    def generate(self, prompt: str, **kwargs) -> str:
+        return "dummy"

@@ -65,7 +65,10 @@ class NumberStoppingCriteria(StoppingCriteria):
             return False
 
 
-class OutputNumbersTokens:
+
+from transformers import LogitsProcessor
+
+class OutputNumbersTokens(LogitsProcessor):
     def __init__(self, tokenizer: PreTrainedTokenizer):
         self.tokenizer = tokenizer
         vocab_size = len(tokenizer)
@@ -93,8 +96,9 @@ class OutputNumbersTokens:
             ):
                 self.allowed_mask[token_id] = True
 
-    def apply_mask(self, scores):
+    def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
         mask = self.allowed_mask.expand_as(scores)
+        scores = scores.clone()
         scores[~mask] = -float("inf")
         return scores
 
@@ -139,7 +143,8 @@ class IntegerStoppingCriteria(StoppingCriteria):
         return False
 
 
-class OutputIntegersTokens:
+
+class OutputIntegersTokens(LogitsProcessor):
     def __init__(self, tokenizer: PreTrainedTokenizer):
         self.tokenizer = tokenizer
         vocab_size = len(tokenizer)
@@ -160,8 +165,9 @@ class OutputIntegersTokens:
             ):
                 self.allowed_mask[token_id] = True
 
-    def apply_mask(self, scores):
+    def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
         mask = self.allowed_mask.expand_as(scores)
+        scores = scores.clone()
         scores[~mask] = -float("inf")
         return scores
 
