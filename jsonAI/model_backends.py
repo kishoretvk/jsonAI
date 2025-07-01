@@ -31,6 +31,7 @@ class TransformersBackend(ModelBackend):
         except Exception as e:
             raise ValueError(f"Failed to generate text: {e}")
 
+
 class OllamaBackend(ModelBackend):
     def __init__(self, model_name: str, host: str = "http://localhost:11434"):
         self.model_name = model_name
@@ -93,12 +94,33 @@ class DummyTokenizer:
     def __init__(self):
         self.vocab = {"dummy": 0}
     def encode(self, text, return_tensors=None):
-        return [0]
+        class DummyTensor:
+            def __init__(self, data):
+                self.data = data
+            def to(self, device):
+                return self
+            def __getitem__(self, idx):
+                return self.data[idx]
+        return DummyTensor([0])
     def decode(self, tokens, skip_special_tokens=True):
         return "dummy"
+    def __len__(self):
+        return len(self.vocab)
+    def get_vocab(self):
+        return self.vocab
 
 class DummyBackend(ModelBackend):
+    class DummyModel:
+        @property
+        def device(self):
+            return "cpu"
+
     def __init__(self):
         self.tokenizer = DummyTokenizer()
+        self.model = self.DummyModel()
     def generate(self, prompt: str, **kwargs) -> str:
+        # Return a number string if the prompt looks like it expects a number
+        lowered = prompt.lower()
+        if any(word in lowered for word in ["number", "integer", "float", "age", "factor", "sum", "product"]):
+            return "42"
         return "dummy"

@@ -1,4 +1,5 @@
 import torch
+import re
 from typing import Union, Callable, List
 from transformers import PreTrainedModel, PreTrainedTokenizer
 from jsonAI.model_backends import ModelBackend
@@ -95,87 +96,109 @@ class TypeGenerator:
     ):
         """
         Shared generation logic with processor and criteria.
-
-        Args:
-            prompt (str): Input prompt to generate from.
-            max_tokens (int): Maximum tokens to generate.
-            logits_processor (Callable): Optional logits processor.
-            stopping_criteria (Callable): Optional stopping criteria.
-            temperature (float): Sampling temperature.
-            post_process (Callable): Function to post-process generated text.
-            iterations (int): Retry counter for error handling.
-
-        Returns:
-            str: Generated text after applying processors and post-processing.
-
-        Raises:
-            RuntimeError: If generation fails after retries.
+        Uses HuggingFace logic for TransformersBackend, otherwise calls backend.generate().
         """
+        from jsonAI.model_backends import TransformersBackend
+
         self.debug("[_generate_with_processor]", prompt, is_prompt=True)
 
-        if not hasattr(self.model_backend, "tokenizer"):
-            raise ValueError("Model backend does not support tokenization.")
-
-        input_tokens = self.model_backend.tokenizer.encode(prompt, return_tensors="pt").to(
-            self.model_backend.model.device
-        )
-
-        try:
-            # Use max_new_tokens for HuggingFace/Transformers models if available
-            generate_args = dict(
-                input_ids=input_tokens,
-                temperature=temperature or self.temperature,
-                logits_processor=logits_processor,
-                stopping_criteria=stopping_criteria,
+        if isinstance(self.model_backend, TransformersBackend):
+            input_tokens = self.model_backend.tokenizer.encode(prompt, return_tensors="pt").to(
+                self.model_backend.model.device
             )
-            model = self.model_backend.model
-            # Check for HuggingFace/Transformers generate signature
-            if hasattr(model, "generate"):
-                # Prefer max_new_tokens if possible
-                generate_args["max_new_tokens"] = max_tokens
-            else:
-                generate_args["max_length"] = max_tokens
-            response = model.generate(**generate_args)
-            generated_text = self.model_backend.tokenizer.decode(response[0], skip_special_tokens=True)
-            return post_process(generated_text) if post_process else generated_text
-        except Exception as e:
-            if iterations < 3:
-                self.debug("Retrying generation due to error:", str(e), is_prompt=False)
-                return self._generate_with_processor(
-                    prompt, max_tokens, logits_processor, stopping_criteria, temperature, post_process, iterations + 1
+            try:
+                generate_args = dict(
+                    input_ids=input_tokens,
+                    temperature=temperature or self.temperature,
+                    logits_processor=logits_processor,
+                    stopping_criteria=stopping_criteria,
                 )
-            else:
-                raise RuntimeError(f"Generation failed after retries: {e}")
+                model = self.model_backend.model
+                if hasattr(model, "generate"):
+                    generate_args["max_new_tokens"] = max_tokens
+                else:
+                    generate_args["max_length"] = max_tokens
+                response = model.generate(**generate_args)
+                generated_text = self.model_backend.tokenizer.decode(response[0], skip_special_tokens=True)
+                return post_process(generated_text) if post_process else generated_text
+            except Exception as e:
+                if iterations < 3:
+                    self.debug("Retrying generation due to error:", str(e), is_prompt=False)
+                    return self._generate_with_processor(
+                        prompt, max_tokens, logits_processor, stopping_criteria, temperature, post_process, iterations + 1
+                    )
+                else:
+                    raise RuntimeError(f"Generation failed after retries: {e}")
+        else:
+            # For all other backends, use their generate() method
+            try:
+                response = self.model_backend.generate(
+                    prompt,
+                    max_new_tokens=max_tokens,
+                    temperature=temperature or self.temperature,
+                )
+                return post_process(response) if post_process else response
+            except Exception as e:
+                if iterations < 3:
+                    self.debug("Retrying generation due to error:", str(e), is_prompt=False)
+                    return self._generate_with_processor(
+                        prompt, max_tokens, logits_processor, stopping_criteria, temperature, post_process, iterations + 1
+                    )
+                else:
+                    raise RuntimeError(f"Generation failed after retries: {e}")
 
     def generate_number(
         self, prompt: str, temperature: Union[float, None] = None, iterations=0
     ) -> float:
-        """Generate a floating point number from the model.
-
-        Args:
-            prompt: The input prompt to condition generation
-            temperature: Sampling temperature (higher = more random)
-            iterations: Internal retry counter for error handling
-
-        Returns:
-            Generated number as float
-
-        Raises:
-            ValueError: If generation fails after max retries
-        """
+        """Generate a floating point number from the model."""
         try:
+            # Add strict instruction to prompt
+            strict_prompt = prompt.strip() + "\nWrap your answer in <answer> tags. Output only the answer, with no explanation or formatting."
+            if hasattr(self.model_backend, "tokenizer"):
+                logits_processor = [self.number_logit_processor]
+                stopping_criteria = [NumberStoppingCriteria(self.model_backend.tokenizer, len(strict_prompt))]
+            else:
+                logits_processor = None
+                stopping_criteria = None
             response = self._generate_with_processor(
-                prompt=prompt,
+                prompt=strict_prompt,
                 max_tokens=self.max_number_tokens,
-                logits_processor=[self.number_logit_processor],
-                stopping_criteria=[
-                    NumberStoppingCriteria(self.model_backend.tokenizer, len(prompt))
-                ],
+                logits_processor=logits_processor,
+                stopping_criteria=stopping_criteria,
                 temperature=temperature,
-                post_process=lambda x: x.replace(" ", "").rstrip(".").split(",")[0]
+                post_process=lambda x: x
             )
-            self.debug("[generate_number]", response)
-            return float(response)
+            self.debug("[generate_number] raw model output:", response)
+            print(f"[generate_number raw output]: {response}")
+            import re, json
+            # Try to extract from <answer> tags
+            answer_match = re.search(r"<answer>(.*?)</answer>", response, re.DOTALL)
+            if answer_match:
+                answer = answer_match.group(1).strip()
+            else:
+                answer = response.strip()
+            # Try to parse as float
+            try:
+                return float(answer)
+            except Exception:
+                # Try to extract first number
+                match = re.search(r"-?\d+(?:\.\d+)?", answer)
+                if match:
+                    return float(match.group(0))
+            # Try to extract JSON and get first number value
+            try:
+                import json
+                obj = json.loads(answer)
+                if isinstance(obj, dict):
+                    for v in obj.values():
+                        if isinstance(v, (int, float)):
+                            return float(v)
+                elif isinstance(obj, (int, float)):
+                    return float(obj)
+            except Exception:
+                pass
+            print(f"[generate_number] No number found in model output: {response}")
+            raise ValueError(f"No number found in model output: {response}")
         except ValueError:
             if iterations > 3:
                 raise ValueError("Failed to generate a valid number")
@@ -188,32 +211,55 @@ class TypeGenerator:
     def generate_integer(
         self, prompt: str, temperature: Union[float, None] = None, iterations=0
     ) -> int:
-        """Generate an integer from the model.
-
-        Args:
-            prompt: The input prompt to condition generation
-            temperature: Sampling temperature (higher = more random)
-            iterations: Internal retry counter for error handling
-
-        Returns:
-            Generated number as integer
-
-        Raises:
-            ValueError: If generation fails after max retries
-        """
+        """Generate an integer from the model."""
         try:
+            # Add strict instruction to prompt
+            strict_prompt = prompt.strip() + "\nWrap your answer in <answer> tags. Output only the answer, with no explanation or formatting."
+            if hasattr(self.model_backend, "tokenizer"):
+                logits_processor = [self.integer_logit_processor]
+                stopping_criteria = [IntegerStoppingCriteria(self.model_backend.tokenizer, len(strict_prompt))]
+            else:
+                logits_processor = None
+                stopping_criteria = None
             response = self._generate_with_processor(
-                prompt=prompt,
+                prompt=strict_prompt,
                 max_tokens=self.max_number_tokens,
-                logits_processor=[self.integer_logit_processor],
-                stopping_criteria=[
-                    IntegerStoppingCriteria(self.model_backend.tokenizer, len(prompt))
-                ],
+                logits_processor=logits_processor,
+                stopping_criteria=stopping_criteria,
                 temperature=temperature,
-                post_process=lambda x: x.replace(" ", "").split(",")[0]
+                post_process=lambda x: x
             )
-            self.debug("[generate_integer]", response)
-            return int(response)
+            self.debug("[generate_integer] raw model output:", response)
+            print(f"[generate_integer raw output]: {response}")
+            import re
+            # Try to extract from <answer> tags
+            answer_match = re.search(r"<answer>(.*?)</answer>", response, re.DOTALL)
+            if answer_match:
+                answer = answer_match.group(1).strip()
+            else:
+                answer = response.strip()
+            # Try to parse as int
+            try:
+                return int(answer)
+            except Exception:
+                # Try to extract first integer
+                match = re.search(r"-?\d+", answer)
+                if match:
+                    return int(match.group(0))
+            # Try to extract JSON and get first integer value
+            try:
+                import json
+                obj = json.loads(answer)
+                if isinstance(obj, dict):
+                    for v in obj.values():
+                        if isinstance(v, int):
+                            return v
+                elif isinstance(obj, int):
+                    return obj
+            except Exception:
+                pass
+            print(f"[generate_integer] No integer found in model output: {response}")
+            raise ValueError(f"No integer found in model output: {response}")
         except ValueError:
             if iterations > 3:
                 raise ValueError("Failed to generate a valid integer")
@@ -279,12 +325,13 @@ class TypeGenerator:
             input_tokens = self.model_backend.tokenizer.encode(prompt, return_tensors="pt").to(
                 self.model_backend.model.device
             )
+            # Fix: input_tokens[0] may be an int, so use len(input_tokens) for token count
             response = self._generate_with_processor(
                 prompt=prompt,
                 max_tokens=self.max_string_token_length,
                 stopping_criteria=[
                     StringStoppingCriteria(
-                        self.model_backend.tokenizer, len(input_tokens[0]), maxLength
+                        self.model_backend.tokenizer, len(input_tokens), maxLength
                     )
                 ],
                 temperature=self.temperature,
