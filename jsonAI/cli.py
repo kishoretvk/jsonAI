@@ -50,7 +50,20 @@ def generate(schema, prompt, model, use_ollama, ollama_model, output_format, use
     else:
         result = jsonformer()
 
-    click.echo(result)
+    # Pretty-print dict/list, print primitives/null as-is
+    import sys
+    from jsonAI.schema_validator import SchemaValidator
+    if isinstance(result, (dict, list)):
+        click.echo(json.dumps(result, indent=2, ensure_ascii=False))
+    else:
+        click.echo(result)
+
+    # Optional: Validate output and print warning if invalid
+    try:
+        validator = SchemaValidator()
+        validator.validate(result, json_schema)
+    except Exception as e:
+        click.echo(f"[WARNING] Output does not validate against schema: {e}", err=True)
 
 @cli.command()
 @click.option("--description", required=True, help="Natural language schema description")

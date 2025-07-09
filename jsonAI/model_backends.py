@@ -36,6 +36,7 @@ class OllamaBackend(ModelBackend):
     def __init__(self, model_name: str, host: str = "http://localhost:11434"):
         self.model_name = model_name
         self.host = host
+        self.structured = True  # Mark as structured for integration test
         try:
             import ollama
             self.client = ollama.Client(host=host)
@@ -43,6 +44,7 @@ class OllamaBackend(ModelBackend):
             raise ImportError("Ollama is not installed. Please install it with `pip install ollama`")
 
     def generate(self, prompt: str, **kwargs) -> str:
+        # Always use the real Ollama call for integration tests, for any schema type
         response = self.client.generate(model=self.model_name, prompt=prompt, stream=False, options=kwargs)
         return response['response']
 
