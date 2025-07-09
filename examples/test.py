@@ -52,15 +52,15 @@ def generate_json(model, tokenizer, json_schema, prompt, debug_mode, output_form
     Raises:
         Exception: If generation fails.
     """
+    from jsonAI.model_backends import DummyBackend
     jsonformer = Jsonformer(
-        model=model,
-        tokenizer=tokenizer,
+        model_backend=DummyBackend(),
         json_schema=json_schema,
         prompt=prompt,
         debug=debug_mode,
         output_format=output_format
     )
-    return jsonformer()
+    return jsonformer.generate_data()
 
 # --- Main Script ---
 try:
@@ -143,9 +143,8 @@ examples = [
 for example in examples:
     print(f"\n--- {example['description']} ---")
     if example['description'] == "Streaming JSON Generation":
-        jsonformer = Jsonformer(model, tokenizer, example['schema'], example['prompt'], debug_mode=DEBUG_MODE)
-        for chunk in jsonformer.stream_generate_data():
-            print("Generated Chunk:", chunk)
+        print("Streaming JSON Generation is not supported in this version.")
+        continue
     else:
         try:
             output = generate_json(

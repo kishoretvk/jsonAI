@@ -100,7 +100,13 @@ class DummyTokenizer:
             def to(self, device):
                 return self
             def __getitem__(self, idx):
+                # Support tuple indices (e.g., [0, -1]) for test compatibility
+                if isinstance(idx, tuple):
+                    # Return a dummy value for any tuple index
+                    return 0
                 return self.data[idx]
+            def __len__(self):
+                return len(self.data)
         return DummyTensor([0])
     def decode(self, tokens, skip_special_tokens=True):
         return "dummy"
@@ -114,6 +120,22 @@ class DummyBackend(ModelBackend):
         @property
         def device(self):
             return "cpu"
+        def forward(self, *args, **kwargs):
+            # Return a dummy object with a .logits attribute for boolean/integer tests
+            class Dummy:
+                def to(self, device):
+                    return self
+                def __getitem__(self, idx):
+                    return 1
+                def __len__(self):
+                    return 1
+            class DummyOutput:
+                @property
+                def logits(self):
+                    import numpy as np
+                    # Return a 2D array (batch_size=1, vocab_size=10) for all test index patterns
+                    return np.full((1, 10), 10)
+            return DummyOutput()
 
     def __init__(self):
         self.tokenizer = DummyTokenizer()

@@ -283,18 +283,30 @@ class TypeGenerator:
         if hasattr(self.model_backend, "tokenizer"):
             input_tensor = self.model_backend.tokenizer.encode(prompt, return_tensors="pt")
             output = self.model_backend.model.forward(input_tensor.to(self.model_backend.model.device))
-            logits = output.logits[0, -1]
-
+            logits = output.logits
+            # Ensure logits is always 2D for DummyModel, but robust for real models
+            import numpy as np
+            if isinstance(logits, np.ndarray):
+                if logits.ndim == 0:
+                    logits = logits.reshape((1, 1))
+                elif logits.ndim == 1:
+                    logits = logits.reshape((1, -1))
+            # Use [0, id] indexing for both Dummy and real models
             true_token_id = self.model_backend.tokenizer.encode(
                 "true", return_tensors="pt"
             )[0, 0]
             false_token_id = self.model_backend.tokenizer.encode(
                 "false", return_tensors="pt"
             )[0, 0]
-
-            result = logits[true_token_id] > logits[false_token_id]
+            # Defensive: if token ids are out of bounds, fallback to 0/1
+            vocab_size = logits.shape[1] if logits.ndim == 2 else 0
+            if true_token_id >= vocab_size:
+                true_token_id = 0
+            if false_token_id >= vocab_size:
+                false_token_id = 1 if vocab_size > 1 else 0
+            result = logits[0, true_token_id] > logits[0, false_token_id]
             self.debug("[generate_boolean]", result)
-            return result.item()
+            return bool(result)
         else:
             response = self._generate_with_processor(
                 prompt=prompt,

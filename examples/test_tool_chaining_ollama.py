@@ -19,11 +19,12 @@ def test_compositional_tool_chaining_ollama():
     registry.register(get_profile)
 
     # Use OllamaBackend (ensure Ollama is running and accessible)
-    backend = OllamaBackend(model_name=os.environ.get("OLLAMA_MODEL", "llama2"))
+    backend = OllamaBackend(model_name=os.environ.get("OLLAMA_MODEL", "qwen3:0.6b"))
 
     user_ids = [1, 2]
     combined = []
     for uid in user_ids:
+        print(f"[OLLAMA CALL] Requesting user info for user_id={uid}")
         jf_user = Jsonformer(
             model_backend=backend,
             json_schema={
@@ -39,8 +40,11 @@ def test_compositional_tool_chaining_ollama():
             debug=True
         )
         jf_user.value = {"id": uid}
-        user_info = jf_user._execute_tool_call(jf_user.value)["tool_result"]
+        user_result = jf_user._execute_tool_call(jf_user.value)
+        print(f"[OLLAMA RESPONSE] User tool call for user_id={uid}: {user_result}")
+        user_info = user_result["tool_result"]
 
+        print(f"[OLLAMA CALL] Requesting profile info for user_id={uid}")
         jf_profile = Jsonformer(
             model_backend=backend,
             json_schema={
@@ -56,7 +60,9 @@ def test_compositional_tool_chaining_ollama():
             debug=True
         )
         jf_profile.value = {"id": uid}
-        profile_info = jf_profile._execute_tool_call(jf_profile.value)["tool_result"]
+        profile_result = jf_profile._execute_tool_call(jf_profile.value)
+        print(f"[OLLAMA RESPONSE] Profile tool call for user_id={uid}: {profile_result}")
+        profile_info = profile_result["tool_result"]
 
         combined.append({"user": user_info, "profile": profile_info})
 
