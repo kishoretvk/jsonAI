@@ -123,11 +123,52 @@ output = jsonformer()
 print(output)
 ```
 
+
 ### CLI Example
 
+#### Basic CLI Usage
+
 ```bash
-jsonai generate --schema schema.json --prompt "Generate a product" --output-format json
+python -m jsonAI.cli generate --schema schema.json --prompt "Generate a product" --output-format json
 ```
+
+#### Using Ollama Backend (Recommended for LLMs)
+
+```bash
+python -m jsonAI.cli generate --schema complex_schema.json --prompt "Generate a comprehensive person profile as JSON." --use-ollama --ollama-model qwen3:1.7b
+```
+
+#### Features
+- Robustly extracts the first valid JSON object from any LLM output (even if wrapped in <answer> tags or surrounded by extra text)
+- Supports all JSON schema types: primitives, enums, arrays, objects, null, oneOf, nested/complex
+- Validates output against the schema and warns if invalid
+- Pretty-prints objects/arrays, prints primitives/null as-is
+- Production-ready for any schema and LLM output style
+
+#### Example Output
+
+```json
+{
+  "id": "profile with all supported JSON schema types.",
+  "name": "re",
+  "age": 30,
+  "is_active": true,
+  "email": "example@example.com",
+  "roles": ["admin", "user"],
+  "address": {"street": "123 Main St", "city": "Anytown", "zip": "12345", "country": "USA"},
+  "preferences": {"newsletter": true, "theme": "dark", "language": "en"},
+  "tags": ["tech", "developer"],
+  "score": 95,
+  "metadata": {"key1": "value1", "key2": "value2"},
+  "status": "active",
+  "history": [{"date": "2023-01-01", "event": "joined", "details": "Account created"}],
+  "profile_picture": "https://example.com/avatar.jpg",
+  "settings": {"notifications": true, "privacy": "private"},
+  "null_field": null
+}
+```
+
+See `complex_schema.json` for a comprehensive schema example.
 
 ### Tool Calling Example
 
