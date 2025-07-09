@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PersonProfile",
+  "description": "A complex person profile with all supported JSON schema types.",
+  "type": "object",
+  "properties": {
+    "id": { "type": "string", "description": "Unique identifier" },
+    "name": { "type": "string", "description": "Full name" },
+    "age": { "type": "number", "description": "Age in years" },
+    "is_active": { "type": "boolean", "description": "Is the user active?" },
+    "email": { "type": ["string", "null"], "format": "email", "description": "Email address or null" },
+    "roles": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["admin", "user", "guest"] },
+      "description": "List of user roles"
+    },
+    "address": {
+      "type": "object",
+      "properties": {
+        "street": { "type": "string" },
+        "city": { "type": "string" },
+        "zip": { "type": "string" },
+        "country": { "type": "string" }
+      },
+      "required": ["street", "city", "zip", "country"],
+      "description": "Mailing address"
+    },
+    "preferences": {
+      "type": "object",
+      "properties": {
+        "newsletter": { "type": "boolean" },
+        "theme": { "type": "string", "enum": ["light", "dark"] },
+        "language": { "type": "string", "default": "en" }
+      },
+      "required": ["newsletter", "theme"],
+      "description": "User preferences"
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Arbitrary tags"
+    },
+    "score": {
+      "type": ["number", "null"],
+      "description": "Optional score, can be null"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Arbitrary metadata (can be empty)",
+      "additionalProperties": true
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "inactive", "pending"],
+      "description": "Account status"
+    },
+    "history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "date": { "type": "string", "format": "date" },
+          "event": { "type": "string" },
+          "details": { "type": ["string", "null"] }
+        },
+        "required": ["date", "event"]
+      },
+      "description": "List of historical events"
+    },
+    "profile_picture": {
+      "type": ["string", "null"],
+      "format": "uri",
+      "description": "Profile picture URL or null"
+    },
+    "settings": {
+      "type": "object",
+      "properties": {
+        "notifications": { "type": "boolean" },
+        "privacy": {
+          "type": "string",
+          "enum": ["public", "private", "friends_only"]
+        }
+      },
+      "required": ["notifications", "privacy"]
+    },
+    "null_field": {
+      "type": "null",
+      "description": "A field that is always null"
+    }
+  },
+  "required": [
+    "id", "name", "age", "is_active", "roles", "address", "preferences", "status", "settings", "null_field"
+  ]
+}
