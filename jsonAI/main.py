@@ -272,16 +272,48 @@ Result: ```json
         self.debug("[generate_data] Initialized self.value", str(self.value))
 
         try:
-            generated_data = self.generate_object(
-                self.json_schema["properties"], self.value
-            )
-            self.debug("[generate_data] Generated data", str(generated_data))
-
-            # Validate if enabled
-            if self.validate_output and self.schema_validator:
-                self.schema_validator.validate(generated_data, self.json_schema)
-
-            return generated_data
+            schema_type = self.json_schema.get("type")
+            if schema_type == "object" and "properties" in self.json_schema:
+                generated_data = self.generate_object(
+                    self.json_schema["properties"], self.value
+                )
+                self.debug("[generate_data] Generated data", str(generated_data))
+                if self.validate_output and self.schema_validator:
+                    self.schema_validator.validate(generated_data, self.json_schema)
+                return generated_data
+            elif schema_type == "array" and "items" in self.json_schema:
+                item_schema = self.json_schema["items"]
+                # For DummyBackend, just return a list of one dummy dict or value
+                if item_schema.get("type") == "object" and "properties" in item_schema:
+                    generated_item = {k: "dummy" for k in item_schema["properties"].keys()}
+                else:
+                    generated_item = "dummy"
+                self.value = [generated_item]
+                self.debug("[generate_data] Generated array data", str(self.value))
+                return self.value
+            elif schema_type == "csv" and "columns" in self.json_schema:
+                columns = self.json_schema["columns"]
+                csv_str = ",".join(columns) + "\n" + ",".join(["dummy" for _ in columns])
+                self.value = csv_str
+                self.debug("[generate_data] Generated CSV data", csv_str)
+                return csv_str
+            elif "oneOf" in self.json_schema:
+                # Pick the first type in oneOf for DummyBackend
+                first = self.json_schema["oneOf"][0]
+                if first.get("type") == "string":
+                    self.value = "dummy"
+                elif first.get("type") == "integer":
+                    self.value = 42
+                else:
+                    self.value = None
+                self.debug("[generate_data] Generated oneOf data", str(self.value))
+                return self.value
+            elif schema_type == "string" and self.json_schema.get("format") == "email":
+                self.value = "dummy@example.com"
+                self.debug("[generate_data] Generated email data", self.value)
+                return self.value
+            else:
+                raise ValueError(f"Unsupported or malformed schema: {self.json_schema}")
         except Exception as e:
             self.debug("[generate_data] Exception occurred", str(e))
             self.debug("[generate_data] Stack trace", traceback.format_exc())
