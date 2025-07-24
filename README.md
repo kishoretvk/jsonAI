@@ -1,8 +1,34 @@
-# jsonAI 
+# jsonAI
 
-jsonAI is a Python library for generating JSON objects based on a given schema using a pre-trained language model. It supports a wide range of data types, including numbers, integers, booleans, strings, datetime, date, time, UUID, and binary data.
+## Table of Contents
 
-The idea to create json structures with strong typed schemas is now possible, with any number of variable combinations.
+- [Features](#features)
+- [Installation](#installation)
+- [Architecture Overview](#architecture-overview)
+- [Testing](#testing)
+- [Examples](#examples)
+  - [Basic JSON Generation](#basic-json-generation)
+  - [XML Output](#xml-output)
+  - [YAML Output](#yaml-output)
+  - [CSV Output](#csv-output)
+  - [CLI Example](#cli-example)
+  - [Tool Calling Example](#tool-calling-example)
+  - [MCP Integration Example](#mcp-integration-example)
+  - [Complex Schema Example](#complex-schema-example)
+  - [Tool Chaining Example](#tool-chaining-example)
+- [Output Format × Type Coverage](#output-format--type-coverage)
+- [Integrations & Capabilities](#integrations--capabilities)
+- [License](#license)
+
+jsonAI is a Python library for generating structured data based on JSON schemas using pre-trained language models. It supports a wide range of data types and output formats, making it ideal for applications requiring dynamic data generation.
+
+## Features
+
+-   **Dynamic JSON Generation**: Generate JSON objects based on schemas with support for complex types.
+-   **Output Formats**: Supports JSON, XML, YAML, and CSV.
+-   **Validation**: Validate generated data against schemas.
+-   **Tool Integration**: Execute tools based on generated data.
+-   **Async Support**: Asynchronous generation and tool execution.
 
 ## Installation
 
@@ -12,36 +38,31 @@ pip install jsonAI
 
 ## Architecture Overview
 
-The `jsonAI` library is structured into several key components to provide robust and flexible structured data generation:
+The `jsonAI` library is modular and consists of the following components:
 
--   **`Jsonformer` (in `jsonAI/main.py`)**: The main facade class that orchestrates the generation process. It takes the model, tokenizer, schema, and prompt, and coordinates the use of other components to produce the final output. It also handles output formatting and validation.
--   **`TypeGenerator` (in `jsonAI/type_generator.py`)**: Responsible for generating values for individual data types based on the schema and the current generation context (prompt).
--   **`OutputFormatter` (in `jsonAI/output_formatter.py`)**: Handles the conversion of the generated data structure (internal dictionary representation) into the desired output format (JSON, XML, YAML).
--   **`SchemaValidator` (in `jsonAI/schema_validator.py`)**: Provides functionality to validate the generated data structure against the provided JSON schema using the `jsonschema` library.
+-   **`Jsonformer`**: Orchestrates the generation process, handles output formatting, and validates data.
+-   **`TypeGenerator`**: Generates values for individual data types.
+-   **`OutputFormatter`**: Converts generated data into the desired format.
+-   **`SchemaValidator`**: Validates data against JSON schemas.
+-   **`ToolRegistry`**: Manages tools for execution.
+-   **`AsyncJsonformer`**: Provides asynchronous support for generation and tool execution.
 
-This modular architecture improves separation of concerns and makes the library more maintainable and extensible.
+## Testing
 
-This currently supports a subset of JSON Schema. Below is a list of the supported schema types:
+The project includes comprehensive tests for each component and integration:
 
-- number
-- integer
-- boolean
-- string  (descriptions also enabled to satisfy summary)
-- datetime
-- date
-- time
-- UUID
-- binary data
-### combinations
-- arrays
-- enums
-- complex object
+-   **Unit Tests**: Test individual components.
+-   **Integration Tests**: Validate the interaction between components.
 
-## Supported Output Formats
+To run tests:
 
-In addition to JSON, `jsonAI` supports generating output in XML, YAML, and CSV formats. You can specify the desired format using the `output_format` parameter in the `Jsonformer` constructor.
+```bash
+pytest tests/
+```
 
-**XML Output Example:**
+## Examples
+
+### Basic JSON Generation
 
 ```python
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -50,7 +71,191 @@ from jsonAI.main import Jsonformer
 model = AutoModelForCausalLM.from_pretrained("gpt2")
 tokenizer = AutoTokenizer.from_pretrained("gpt2")
 
-json_schema = {
+schema = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "age": {"type": "integer"},
+        "isStudent": {"type": "boolean"}
+    }
+}
+
+prompt = "Generate a person's profile."
+jsonformer = Jsonformer(model, tokenizer, schema, prompt)
+output = jsonformer()
+print(output)
+```
+
+
+### XML Output
+### YAML Output
+
+```python
+schema = {
+    "type": "object",
+    "properties": {
+        "city": {"type": "string"},
+        "population": {"type": "integer"}
+    }
+}
+prompt = "Generate a city profile."
+jsonformer = Jsonformer(model, tokenizer, schema, prompt, output_format="yaml")
+output = jsonformer()
+print(output)
+```
+
+### CSV Output
+
+```python
+schema = {
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "score": {"type": "number"}
+        }
+    }
+}
+prompt = "Generate a list of students and their scores."
+jsonformer = Jsonformer(model, tokenizer, schema, prompt, output_format="csv")
+output = jsonformer()
+print(output)
+```
+
+
+### CLI Example
+
+#### Basic CLI Usage
+
+```bash
+python -m jsonAI.cli generate --schema schema.json --prompt "Generate a product" --output-format json
+```
+
+#### Using Ollama Backend (Recommended for LLMs)
+
+```bash
+python -m jsonAI.cli generate --schema complex_schema.json --prompt "Generate a comprehensive person profile as JSON." --use-ollama --ollama-model qwen3:1.7b
+```
+
+#### Features
+- Robustly extracts the first valid JSON object from any LLM output (even if wrapped in <answer> tags or surrounded by extra text)
+- Supports all JSON schema types: primitives, enums, arrays, objects, null, oneOf, nested/complex
+- Validates output against the schema and warns if invalid
+- Pretty-prints objects/arrays, prints primitives/null as-is
+- Production-ready for any schema and LLM output style
+
+#### Example Output
+
+```json
+{
+  "id": "profile with all supported JSON schema types.",
+  "name": "re",
+  "age": 30,
+  "is_active": true,
+  "email": "example@example.com",
+  "roles": ["admin", "user"],
+  "address": {"street": "123 Main St", "city": "Anytown", "zip": "12345", "country": "USA"},
+  "preferences": {"newsletter": true, "theme": "dark", "language": "en"},
+  "tags": ["tech", "developer"],
+  "score": 95,
+  "metadata": {"key1": "value1", "key2": "value2"},
+  "status": "active",
+  "history": [{"date": "2023-01-01", "event": "joined", "details": "Account created"}],
+  "profile_picture": "https://example.com/avatar.jpg",
+  "settings": {"notifications": true, "privacy": "private"},
+  "null_field": null
+}
+```
+
+See `complex_schema.json` for a comprehensive schema example.
+
+### Tool Calling Example
+
+```python
+def send_email(email):
+    print(f"Sending email to {email}")
+    return "Email sent"
+
+tool_registry = ToolRegistry()
+tool_registry.register_tool("send_email", send_email)
+
+schema = {
+    "type": "object",
+    "properties": {
+        "email": {"type": "string", "format": "email"}
+    },
+    "x-jsonai-tool-call": {
+        "name": "send_email",
+        "arguments": {"email": "email"}
+    }
+}
+prompt = "Generate a user email."
+jsonformer = Jsonformer(model, tokenizer, schema, prompt, tool_registry=tool_registry)
+output = jsonformer()
+print(output)
+```
+
+### MCP Integration Example
+
+```python
+def mcp_callback(tool_name, server_name, kwargs):
+    # Simulate MCP call
+    return f"Called {tool_name} on {server_name} with {kwargs}"
+
+schema = {
+    "type": "object",
+    "properties": {
+        "query": {"type": "string"}
+    },
+    "x-jsonai-tool-call": {
+        "name": "search_tool",
+        "arguments": {"query": "query"}
+    }
+}
+jsonformer = Jsonformer(model, tokenizer, schema, prompt, mcp_callback=mcp_callback)
+output = jsonformer()
+print(output)
+```
+
+### Complex Schema Example
+
+```python
+schema = {
+    "type": "object",
+    "properties": {
+        "user": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "uuid"},
+                "name": {"type": "string"},
+                "email": {"type": "string", "format": "email"}
+            }
+        },
+        "roles": {
+            "type": "array",
+            "items": {"type": "string", "enum": ["admin", "user", "guest"]}
+        },
+        "profile": {
+            "oneOf": [
+                {"type": "object", "properties": {"age": {"type": "integer"}}},
+                {"type": "object", "properties": {"birthdate": {"type": "date"}}}
+            ]
+        }
+    },
+    "x-jsonai-tool-call": {
+        "name": "send_welcome_email",
+        "arguments": {"email": "user.email"}
+    }
+}
+# ...setup model, tokenizer, tool_registry, etc...
+jsonformer = Jsonformer(model, tokenizer, schema, prompt, tool_registry=tool_registry)
+output = jsonformer()
+print(output)
+```
+
+```python
+schema = {
     "type": "object",
     "properties": {
         "book": {
@@ -64,571 +269,120 @@ json_schema = {
     }
 }
 
-prompt = "Generate information about a book."
-
-jsonformer = Jsonformer(
-    model=model,
-    tokenizer=tokenizer,
-    json_schema=json_schema,
-    prompt=prompt,
-    output_format="xml"
-)
-
-    generated_data = jsonformer()
-    print(generated_data)
+prompt = "Generate details for a book."
+jsonformer = Jsonformer(model, tokenizer, schema, prompt, output_format="xml")
+output = jsonformer()
+print(output)
 ```
 
-**CSV Output Example:**
+### Tool Chaining Example
+
+You can chain multiple tools together using the `x-jsonai-tool-chain` schema key. Each tool in the chain receives arguments from the generated data and/or previous tool outputs.
 
 ```python
-from transformers import AutoModelForCausalLM, AutoTokenizer
 from jsonAI.main import Jsonformer
+from jsonAI.tool_registry import ToolRegistry
 
-model = AutoModelForCausalLM.from_pretrained("gpt2")
-tokenizer = AutoTokenizer.from_pretrained("gpt2")
+def add(x, y):
+    return {"sum": x + y}
 
-json_schema = {
-    "type": "array",
-    "items": {
-        "type": "object",
-        "properties": {
-            "name": {"type": "string"},
-            "age": {"type": "integer"},
-            "score": {"type": "number"}
-        }
-    }
-}
+def multiply(sum, factor):
+    return {"product": sum * factor}
 
-prompt = "Generate data for three students with names, ages, and test scores."
+registry = ToolRegistry()
+registry.register_tool("add", add)
+registry.register_tool("multiply", multiply)
 
-jsonformer = Jsonformer(
-    model=model,
-    tokenizer=tokenizer,
-    json_schema=json_schema,
-    prompt=prompt,
-    output_format="csv"
-)
-
-generated_data = jsonformer()
-print(generated_data)
-```
-
-**YAML Output Example:**
-
-```python
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from jsonAI.main import Jsonformer
-
-model = AutoModelForCausalLM.from_pretrained("gpt2")
-tokenizer = AutoTokenizer.from_pretrained("gpt2")
-
-json_schema = {
+schema = {
     "type": "object",
     "properties": {
-        "person": {
-            "type": "object",
-            "properties": {
-                "name": {"type": "string"},
-                "age": {"type": "integer"},
-                "isStudent": {"type": "boolean"}
-            }
-        }
-    }
-}
-
-prompt = "Generate information about a person."
-
-jsonformer = Jsonformer(
-    model=model,
-    tokenizer=tokenizer,
-    json_schema=json_schema,
-    prompt=prompt,
-    output_format="yaml"
-)
-
-generated_data = jsonformer()
-print(generated_data)
-```
-
-## Output Validation
-
-You can enable schema validation for the generated output by setting the `validate_output` parameter to `True`. This requires the `jsonschema` library to be installed (`pip install jsonschema`).
-
-```python
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from jsonAI.main import Jsonformer
-
-model = AutoModelForCausalLM.from_pretrained("gpt2")
-tokenizer = AutoTokenizer.from_pretrained("gpt2")
-
-json_schema = {
-    "type": "object",
-    "properties": {
-        "name": {"type": "string"},
-        "age": {"type": "integer", "minimum": 0}
+        "x": {"type": "integer"},
+        "y": {"type": "integer"},
+        "factor": {"type": "integer"}
     },
-    "required": ["name", "age"]
-}
-
-prompt = "Generate a person's information."
-
-# This will raise a jsonschema.exceptions.ValidationError if the output doesn't match the schema
-jsonformer = Jsonformer(
-    model=model,
-    tokenizer=tokenizer,
-    json_schema=json_schema,
-    prompt=prompt,
-    validate_output=True
-)
-
-generated_data = jsonformer()
-print(generated_data)
-```
-
-## Examples
-
-We have included examples to demonstrate how to integrate `jsonAI` with other libraries and frameworks. You can find them in the `examples/` directory.
-
-### FastAPI Integration Example
-
-This example shows how to use `jsonAI` within a FastAPI web application to create an API endpoint that generates structured data based on user input.
-
-To run the FastAPI example:
-
-1.  Install necessary dependencies:
-    ```bash
-    pip install fastapi uvicorn transformers torch jsonschema PyYAML
-    ```
-2.  Navigate to the `examples/` directory.
-3.  Run the server:
-    ```bash
-    uvicorn fastapi_example:app --reload
-    ```
-4.  Send a POST request to `http://127.0.0.1:8000/generate/` with a JSON body containing `prompt` and optionally `json_schema`, `output_format`, and `validate_output`. See the comments in `examples/fastapi_example.py` for more details.
-
-## Basic Usage
-
-
-## Examples
-
-``` python 
-# Define the JSON schema
-json_schema = {
-    "type": "object",
-    "properties": {
-        "transaction_id": {"type": "uuid"},
-        "store": {
-            "type": "object",
-            "properties": {
-                "name": {"type": "string"},
-                "location": {"type": "string"},
-                "datetime": {"type": "datetime"}
-            }
+    "x-jsonai-tool-chain": [
+        {
+            "name": "add",
+            "arguments": {"x": "x", "y": "y"}
         },
-        "customer": {
-            "type": "object",
-            "properties": {
-                "customer_id": {"type": "uuid"},
-                "name": {"type": "string"},
-                "membership": {"type": "boolean"}
-            }
-        },
-        "items": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "item_id": {"type": "uuid"},
-                    "name": {"type": "string"},
-                    "category": {"type": "string"},
-                    "price": {"type": "number"},
-                    "quantity": {"type": "integer"}
-                }
-            }
-        },
-        "total_amount": {"type": "number"},
-        "payment_method": {"type": "string"},
-        "transaction_date": {"type": "date"},
-        "transaction_time": {"type": "time"},
-        "receipt_binary": {"type": "binary"}
-    }
-}
-
-# Define the prompt
-prompt = "Generate a JSON object representing a transaction at a Starbucks coffee shop. The transaction includes details such as transaction ID, store information, customer information, items purchased, total amount, payment method, transaction date and time, and a binary receipt."
-
-# Initialize Jsonformer
-jsonformer = Jsonformer(
-    model=model,
-    tokenizer=tokenizer,
-    json_schema=json_schema,
-    prompt=prompt,
-    debug=True,
-    output_format="json", # Specify output format (e.g., "json", "xml", "yaml")
-    validate_output=False # Enable/disable validation (requires jsonschema)
-)
-
-# Generate the data
-generated_data = jsonformer()
-print(generated_data)
-# The highlight_values utility might be useful for debugging JSON output
-# from jsonAI.format import highlight_values
-# highlight_values(generated_data)
-
-```
-
-## Example with various types
-
-```python
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from jsonAI.main import Jsonformer
-
-model = AutoModelForCausalLM.from_pretrained("gpt2")
-tokenizer = AutoTokenizer.from_pretrained("gpt2")
-json_schema = {
-    "type": "object",
-    "properties": {
-        "number": {"type": "number"},
-        "integer": {"type": "integer"},
-        "boolean": {"type": "boolean"},
-        "string": {"type": "string"},
-        "datetime": {"type": "datetime"},
-        "date": {"type": "date"},
-        "time": {"type": "time"},
-        "uuid": {"type": "uuid"},
-        "binary": {"type": "binary"},
-    }
-}
-prompt = "Generate a JSON object with various data types"
-
-jsonformer = Jsonformer(
-    model=model,
-    tokenizer=tokenizer,
-    json_schema=json_schema,
-    prompt=prompt,
-    debug=True,
-    output_format="json", # Specify output format
-    validate_output=False # Enable/disable validation
-)
-
-generated_data = jsonformer()
-print(generated_data)
-
-```
-
-## Probabilistic Generation
-
-`jsonAI` includes advanced features for probabilistic structured generation, allowing you to extract probability distributions or weighted means for certain types.
-
-### Supported Probabilistic Types:
-
--   `p_enum`: Returns a list of possible values and their probabilities for an enumeration
--   `p_integer`: Returns the probabilistic weighted mean for an integer range
-
-### Example:
-
-```python
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from jsonAI.main import Jsonformer
-
-model_name = "databricks/dolly-v2-3b" # Note: Probabilistic features may work better with larger models
-model = AutoModelForCausalLM.from_pretrained(model_name)
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-
-json_schema = {
-    "type": "object",
-    "properties": {
-        # Get probability distribution for age within a range
-        "age_probs": {"type": "p_enum", "values": [str(s) for s in range(10, 20)]},
-        # Get probabilistic weighted mean for age within a range
-        "age_wmean": {"type": "p_integer", "minimum": 10, "maximum": 20},
-        # Get probability distribution for a boolean choice
-        "is_student_probs": {"type": "p_enum", "values": ["true", "false"]},
-        # Standard boolean generation
-        "is_student": {"type": "boolean"},
-        # Standard types also supported alongside probabilistic ones
-        "name": {"type": "string", "maxLength": 4},
-        "age": {"type": "integer"},
-        "unit_time": {"type": "number"},
-        "courses": {"type": "array", "items": {"type": "string"}},
-        "trim": {"type": ["string", "null"]},
-        "color": {
-            "type": "enum",
-            "values": ["red", "green", "blue", "brown", "white", "black"],
-        },
-    },
-}
-
-prompt = "Generate a young person's information based on the following schema:"
-jsonformer = Jsonformer(model, tokenizer, json_schema, prompt, temperature=0)
-generated_data = jsonformer()
-
-print(generated_data)
-```
-
-## Development
-
-### this is for colab 
-
-
-```bash
-# autoreload your package
-%load_ext autoreload
-%autoreload 2
-
-```
-```bash
-from transformers import AutoModelForCausalLM, AutoTokenizer
-import torch
-
-print("Loading model and tokenizer...")
-model_name = "databricks/dolly-v2-3b"
-model = AutoModelForCausalLM.from_pretrained(
-    model_name,
-    use_cache=True,
-    torch_dtype=torch.float16,
-    attn_implementation="eager",
-).to("cuda:0")
-tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True, use_cache=True)
-print("Loaded model and tokenizer")
-
-```
-
-```bash
-!git clone https://github.com/kishoretvk/jsonAI.git
-%cd jsonAI
-```
-
-```bash
-!pip install jaxtyping termcolor typeguard
-```
-
-```bash
-from jsonAI.format import highlight_values
-from jsonAI.main import Jsonformer
-
-```
-
-### after the above stpes on colab try any example given 
-
-
-
-
-# below refers to older code 
-
-
-### prob_jsonformer: Probabilistic Structured JSON from Language Models.
-
-This fork has been modified to include the token probabilities. This is not complaint with json schema, but it can be useful for efficient extracting of a range of possible values.
-
-I've also merged some of the recent PR's for enum, integer, null, union. They are not yet included in the upstream Jsonformer. You can see them all below in this example:
-
-
-~~~
-# installing
-pip install git+https://github.com/wassname/prob_jsonformer.git
-~~~
-
-
-## Metrics
-
-How well does it work? Well when I asked is `Q: Please sample a number from the distribution [0, 20]: `, assumming it should be a uniform distribution, this is how well it did:
-
-Lower is better as it indicates a faithful sampling of the distribution. Time is in seconds.
-
-| method                   | KL_div_loss |     time |
-| :----------------------- | ----------: | -------: |
-| method0: sampling        |    -3.09214 |  48.5044 |
-| method1: hindsight       |    -3.09214 | 0.683987 |
-| method3: generation tree |   **-3.09216**| **0.075112**|
-
-KL_div_loss is the -1 * KL divergence between the true distribution and the generated distribution. 
-
-
-## Example
-
-```python
-from jsonAI.main import Jsonformer
-from transformers import AutoModelForCausalLM, AutoTokenizer
-
-model_name = "databricks/dolly-v2-3b"
-model = AutoModelForCausalLM.from_pretrained(model_name)
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-
-json_schema = {
-    "type": "object",
-    "properties": {
-        # we can return the probability of each choice, even if they are multiple tokens
-        "age_probs": {"type": "p_enum", "values": [str(s) for s in range(10, 20)]},
-        # we can return the probabilistic weighted mean of a range
-        "age_wmean": {"type": "p_integer", "minimum": 10, "maximum": 20},
-        # the prob of true and false
-        "is_student_probs": {"type": "p_enum", "values": ["true", "false"]},
-        "is_student": {"type": "boolean"},
-        # we've merged patches for enum, integer, null, union - currently mising from jsonformer
-        "name": {"type": "string", "maxLength": 4},
-        "age": {"type": "integer"},
-        "unit_time": {"type": "number"},
-        "courses": {"type": "array", "items": {"type": "string"}},
-        "trim": {"type": ["string", "null"]},
-        "color": {
-            "type": "enum",
-            "values": ["red", "green", "blue", "brown", "white", "black"],
-        },
-    },
-}
-
-prompt = "Generate a young person's information based on the following schema:"
-jsonformer = Jsonformer(
-    model_backend=(model, tokenizer),
-    json_schema=json_schema,
-    prompt=prompt,
-    temperature=0
-)
-generated_data = jsonformer()
-
-generated_data = {
-    "age_probs": [
-        {"prob": 0.62353515625, "choice": "10"},
-        {"prob": 0.349609375, "choice": "12"},
-        {"prob": 0.01123809814453125, "choice": "11"},
-        {"prob": 0.00760650634765625, "choice": "16"},
-        {"prob": 0.0025482177734375, "choice": "13"},
-        {"prob": 0.0025081634521484375, "choice": "15"},
-        {"prob": 0.0018062591552734375, "choice": "14"},
-        {"prob": 0.00104522705078125, "choice": "18"},
-        {"prob": 0.00011551380157470703, "choice": "17"},
-        {"prob": 5.042552947998047e-05, "choice": "19"},
-    ],
-    "age_wmean": 15.544570922851562,
-    "is_student_probs": [
-        {"prob": 0.962890625, "choice": "true"},
-        {"prob": 0.037322998046875, "choice": "false"},
-    ],
-    "is_student": False,
-    "name": "John",
-    "age": 17,
-    "unit_time": 0.5,
-    "courses": ["C++"],
-    "trim": None,
-    "color": "green",
-}
-```
-
- The original [README](https://github.com/1rgs/jsonformer) is included below.
-
-# ORIGINAL: Jsonformer: A Bulletproof Way to Generate Structured JSON from Language Models.
-
-### Problem: Getting models to output structured JSON is hard
-
-### Solution: Only generate the content tokens and fill in the fixed tokens
-
-[![colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/1rgs/jsonformer/blob/main/Jsonformer_example.ipynb)
-
-![cover](img/cover4.png)
-
-Generating structured JSON from language models is a challenging task. The
-generated JSON must be syntactically correct, and it must conform to a schema
-that specifies the structure of the JSON.
-
-Current approaches to this problem are brittle and error-prone. They rely on prompt engineering, fine-tuning, and post-processing, but they still fail to generate syntactically correct JSON in many cases.
-
-Jsonformer is a new approach to this problem. In structured data, many tokens are fixed and predictable. Jsonformer is a wrapper around Hugging Face models that fills in the fixed tokens during the generation process, and only delegates the generation of content tokens to the language model. This makes it more efficient and bulletproof than existing approaches.
-
-This currently supports a subset of JSON Schema. Below is a list of the supported schema types:
-
-- number
-- boolean
-- string
-- array
-- object
-
-## Example
-
-```python
-from jsonformer import Jsonformer
-from transformers import AutoModelForCausalLM, AutoTokenizer
-
-model = AutoModelForCausalLM.from_pretrained("databricks/dolly-v2-12b")
-tokenizer = AutoTokenizer.from_pretrained("databricks/dolly-v2-12b")
-
-json_schema = {
-    "type": "object",
-    "properties": {
-        "name": {"type": "string"},
-        "age": {"type": "number"},
-        "is_student": {"type": "boolean"},
-        "courses": {
-            "type": "array",
-            "items": {"type": "string"}
+        {
+            "name": "multiply",
+            "arguments": {"sum": "sum", "factor": "factor"}
         }
-    }
+    ]
 }
 
-prompt = "Generate a person's information based on the following schema:"
-jsonformer = Jsonformer(model, tokenizer, json_schema, prompt)
-generated_data = jsonformer()
-
-print(generated_data)
+prompt = "Calculate (x + y) * factor."
+jsonformer = Jsonformer(
+    model_backend=None,  # Not used in this example
+    json_schema=schema,
+    prompt=prompt,
+    tool_registry=registry
+)
+# Provide input data (simulate generated data)
+jsonformer.value = {"x": 2, "y": 3, "factor": 4}
+generated = jsonformer.generate_data()
+result = jsonformer._execute_tool_call(generated)
+print(result)
+# Output will include all intermediate and final tool results.
 ```
 
-### Jsonformer works on complex schemas, even with tiny models. Here is an example of a schema with nested objects and arrays, generated by a 3B parameter model.
-
-```python
-{"type": "object", "properties": {"car": {"type": "object", "properties": {"make": {"type": "string"}, "model": {"type": "string"}, "year": {"type": "number"}, "colors": {"type": "array", "items": {"type": "string"}}, "features": {"type": "object", "properties": {"audio": {"type": "object", "properties": {"brand": {"type": "string"}, "speakers": {"type": "number"}, "hasBluetooth": {"type": "boolean"}}}, "safety": {"type": "object", "properties": {"airbags": {"type": "number"}, "parkingSensors": {"type": "boolean"}, "laneAssist": {"type": "boolean"}}}, "performance": {"type": "object", "properties": {"engine": {"type": "string"}, "horsepower": {"type": "number"}, "topSpeed": {"type": "number"}}}}}}}, "owner": {"type": "object", "properties": {"firstName": {"type": "string"}, "lastName": {"type": "string"}, "age": {"type": "number"}}}}}
-```
-
-```python
-{
-  car: {
-    make: "audi",
-    model: "model A8",
-    year: 2016.0,
-    colors: [
-      "blue"
-    ],
-    features: {
-      audio: {
-        brand: "sony",
-        speakers: 2.0,
-        hasBluetooth: True
-      },
-      safety: {
-        airbags: 2.0,
-        parkingSensors: True,
-        laneAssist: True
-      },
-      performance: {
-        engine: "4.0",
-        horsepower: 220.0,
-        topSpeed: 220.0
-      }
-    }
-  },
-  owner: {
-    firstName: "John",
-    lastName: "Doe",
-    age: 40.0
-  }
-}
-```
-
-## Features
-
-- Bulletproof JSON generation: Jsonformer ensures that the generated JSON is always syntactically correct and conforms to the specified schema.
-- Efficiency: By generating only the content tokens and filling in the fixed tokens, Jsonformer is more efficient than generating a full JSON string and parsing it.
-- Flexible and extendable: Jsonformer is built on top of the Hugging Face transformers library, making it compatible with any model that supports the Hugging Face interface.
+## Output Format × Type Coverage
 
 
+| Type      | Example         | JSON | XML  | YAML | CSV* |
+|-----------|----------------|------|------|------|------|
+| number    | 3.14           | ✅   | ✅   | ✅   | ✅   |
+| integer   | 42             | ✅   | ✅   | ✅   | ✅   |
+| boolean   | true           | ✅   | ✅   | ✅   | ✅   |
+| string    | "hello"        | ✅   | ✅   | ✅   | ✅   |
+| datetime  | "2023-06-29T12:00:00Z" | ✅   | ✅   | ✅   | ✅   |
+| date      | "2023-06-29"   | ✅   | ✅   | ✅   | ✅   |
+| time      | "12:00:00"     | ✅   | ✅   | ✅   | ✅   |
+| uuid      | "123e4567-e89b-12d3-a456-426614174000" | ✅   | ✅   | ✅   | ✅   |
+| binary    | "SGVsbG8="     | ✅   | ✅   | ✅   | ✅   |
+| null      | null           | ✅   | (⚠️) | ✅   | (⚠️) |
+| array     | [1,2,3]        | ✅   | ✅   | ✅   | (⚠️) |
+| object    | {"a":1}        | ✅   | ✅   | ✅   | (⚠️) |
+| enum      | "red"          | ✅   | ✅   | ✅   | ✅   |
+| p_enum    | "blue"         | ✅   | ✅   | ✅   | ✅   |
+| p_integer | 7              | ✅   | ✅   | ✅   | ✅   |
 
-```bash
-poetry install
-```
+✅ = Supported
+⚠️ = Supported with caveats (e.g., nulls in XML/CSV, arrays/objects in CSV)
+*CSV: Only arrays of objects (tabular) are practical
 
-```bash
-poetry run python -m jsonformer.example
-```
+
+## Integrations & Capabilities
+
+- **LLM Integration**: Use with HuggingFace Transformers, OpenAI, vLLM, Ollama, etc.
+- **FastAPI**: Serve generation endpoints via FastAPI (see `examples/fastapi_example.py`).
+- **Tool Registry**: Register and call Python or MCP tools from schemas.
+- **Async Support**: Use `AsyncJsonformer` for async workflows.
+
+See the [examples/](examples/) directory for more advanced usage and integration patterns.
 
 ## License
 
-Jsonformer is released under the MIT License. You are free to use, modify, and distribute this software for any purpose, commercial or non-commercial, as long as the original copyright and license notice are included.
+This project is licensed under the MIT License.
+
+## Streaming Support
+
+jsonAI now supports streaming data generation for real-time applications. Use the `stream_generate_data` method in `Jsonformer` or `AsyncJsonformer` to generate data incrementally.
+
+### Example
+
+```python
+# Streaming with Jsonformer
+jsonformer = Jsonformer(model_backend, json_schema, prompt)
+for data_chunk in jsonformer.stream_generate_data():
+    print(data_chunk)
+
+# Streaming with AsyncJsonformer
+async def async_stream():
+    async_jsonformer = AsyncJsonformer(jsonformer)
+    async for data_chunk in async_jsonformer.stream_generate_data():
+        print(data_chunk)
+
+asyncio.run(async_stream())
+```

@@ -1,12 +1,15 @@
-from typing import List, Union, Dict, Any
-
+from typing import List, Union, Dict, Any, Callable, Optional
+import asyncio
 from termcolor import cprint
-from transformers import PreTrainedModel, PreTrainedTokenizer
 import json
+import traceback
 
+from jsonAI.model_backends import ModelBackend
 from jsonAI.type_generator import TypeGenerator
 from jsonAI.output_formatter import OutputFormatter
 from jsonAI.schema_validator import SchemaValidator
+from jsonAI.tool_registry import ToolRegistry
+from jsonAI.async_tool_executor import AsyncToolExecutor, ToolExecutionError
 
 
 GENERATION_MARKER = "|GENERATION|"
@@ -15,10 +18,17 @@ GENERATION_MARKER = "|GENERATION|"
 class Jsonformer:
     value: Dict[str, Any] = {}
 
+    def __setattr__(self, name, value):
+        super().__setattr__(name, value)
+        if name in ['tool_registry', 'mcp_callback'] and hasattr(self, 'debug_on'):
+            self.debug(f"[__setattr__] Attribute '{name}' modified", str(value))
+            self.debug(f"[__setattr__] Attribute '{name}' type", str(type(value)))
+            import traceback
+            self.debug(f"[__setattr__] Stack trace for '{name}' modification", traceback.format_stack())
+
     def __init__(
         self,
-        model: PreTrainedModel,
-        tokenizer: PreTrainedTokenizer,
+        model_backend: ModelBackend,
         json_schema: Dict[str, Any],
         prompt: str,
         *,
@@ -29,18 +39,23 @@ class Jsonformer:
         max_number_tokens: int = 6,
         temperature: float = 1.0,
         max_string_token_length: int = 175,
+        tool_registry: Optional[object] = None,
+        mcp_callback: Optional[Callable] = None,
     ):
-        self.model = model
-        self.tokenizer = tokenizer
+        self.model_backend = model_backend
         self.json_schema = json_schema
         self.prompt = prompt
         self.output_format = output_format
         self.validate_output = validate_output
+        self.tool_registry = tool_registry
+        self.mcp_callback = mcp_callback
         self.debug_on = debug
 
+        self.debug("[__init__] Initialized tool_registry", str(self.tool_registry))
+        self.debug("[__init__] Initialized mcp_callback", str(self.mcp_callback))
+
         self.type_generator = TypeGenerator(
-            model=model,
-            tokenizer=tokenizer,
+            model_backend=self.model_backend,
             debug=self.debug,
             max_number_tokens=max_number_tokens,
             max_string_token_length=max_string_token_length,
@@ -51,6 +66,12 @@ class Jsonformer:
 
         self.generation_marker = "|GENERATION|"
         self.max_array_length = max_array_length
+
+        if self.tool_registry is not None and hasattr(self.tool_registry, "get_tool"):
+            self.debug("[__init__] tool_registry.get_tool type", str(type(self.tool_registry.get_tool)))
+            self.debug("[__init__] tool_registry.get_tool value", str(self.tool_registry.get_tool))
+        self.debug("[__init__] mcp_callback type", str(type(self.mcp_callback)))
+        self.debug("[__init__] mcp_callback value", str(self.mcp_callback))
 
     def debug(self, caller: str, value: str, is_prompt: bool = False):
         if self.debug_on:
@@ -64,99 +85,58 @@ class Jsonformer:
     def generate_object(
         self, properties: Dict[str, Any], obj: Dict[str, Any]
     ) -> Dict[str, Any]:
+        import json as _json
+        # If obj is a string and parses as a valid JSON object, return it immediately
+        if isinstance(obj, str):
+            try:
+                parsed = _json.loads(obj)
+                if isinstance(parsed, dict):
+                    return parsed
+            except Exception:
+                pass
         for key, schema in properties.items():
-            self.debug("[generate_object] generating value for", key)
+            self.debug("[generate_object] Generating value for key", key)
             obj[key] = self.generate_value(schema, obj, key)
+            self.debug("[generate_object] Updated object", str(obj))
         return obj
 
-    def generate_array(
-        self, item_schema: Dict[str, Any], obj: List[Any]
-    ) -> list:
-        for _ in range(self.max_array_length):
-            element = self.generate_value(item_schema, obj)
-            obj[-1] = element
-
-            obj.append(self.generation_marker)
-            input_prompt = self.get_prompt()
-            obj.pop()
-            input_tensor = self.tokenizer.encode(
-                input_prompt, return_tensors="pt"
-            )
-            output = self.model.forward(
-                input_tensor.to(self.model.device)
-            )
-            logits = output.logits[0, -1]
-
-            top_indices = logits.topk(30).indices
-            sorted_indices = logits[top_indices].argsort(
-                descending=True
-            )
-            sorted_token_ids = top_indices[sorted_indices]
-
-            found_comma = False
-            found_close_bracket = False
-
-            for token_id in sorted_token_ids:
-                decoded_token = self.tokenizer.decode(
-                    token_id, skip_special_tokens=True
-                )
-                if "," in decoded_token:
-                    found_comma = True
-                    break
-                if "]" in decoded_token:
-                    found_close_bracket = True
-                    break
-
-            if found_close_bracket or not found_comma:
-                break
-
-        return obj
+    async def generate_array(self, item_schema: Dict[str, Any], obj: List[Any]) -> list:
+        """Generate an array following the item schema.
+        
+        Uses TypeGenerator's helper methods when possible for consistent behavior.
+        """
+        tasks = [self.generate_value(item_schema, obj) for _ in range(self.max_array_length)]
+        results = await asyncio.gather(*tasks)
+        return results
 
     def choose_type_to_generate(self, possible_types: List[str]) -> str:
-        possible_types = list(set(possible_types))  # remove duplicates
-        self.debug("[choose_type_to_generate]", str(possible_types))
-        if len(possible_types) < 1:
-            raise ValueError("Union type must not be empty")
-        elif len(possible_types) == 1:
-            return possible_types[0]
-
-        prompt = self.get_prompt()
-        input_tensor = self.tokenizer.encode(
-            prompt, return_tensors="pt"
+        """Select which type to generate from possible options.
+        
+        Delegates to TypeGenerator's choose_type() method.
+        """
+        return self.type_generator.choose_type(
+            prompt=self.get_prompt(),
+            possible_types=possible_types
         )
-        output = self.model.forward(
-            input_tensor.to(self.model.device)
-        )
-        logits = output.logits[0, -1]
 
-        max_type = None
-        max_logit = -float("inf")
-        for possible_type in possible_types:
-            try:
-                prefix_tokens = self.type_generator.type_prefix_tokens[
-                    possible_type
-                ]
-            except KeyError:
-                raise ValueError(f"Unsupported schema type: {possible_type}")
-            max_type_logit = logits[prefix_tokens].max()
-            if max_type_logit > max_logit:
-                max_type = possible_type
-                max_logit = max_type_logit
-
-        if max_type is None:
-            raise Exception(
-                "Unable to find best type to generate for union type"
-            )
-        self.debug("[choose_type_to_generate]", max_type)
-        return max_type
-
+    # Refactor generate_value to modularize schema type handling
     def generate_value(
         self,
         schema: Dict[str, Any],
         obj: Union[Dict[str, Any], List[Any]],
         key: Union[str, None] = None,
     ) -> Any:
+        import json as _json
+        # If obj is a string and parses as a valid JSON object, return it immediately
+        if isinstance(obj, str):
+            try:
+                parsed = _json.loads(obj)
+                if isinstance(parsed, dict):
+                    return parsed
+            except Exception:
+                pass
         schema_type = schema["type"]
+        self.debug("[generate_value] Schema type", schema_type)
         if isinstance(schema_type, list):
             if key:
                 obj[key] = self.generation_marker
@@ -164,104 +144,36 @@ class Jsonformer:
                 obj.append(self.generation_marker)
             schema_type = self.choose_type_to_generate(schema_type)
 
+        # Ensure generation marker is added for primitive types
+        if schema_type in ["string", "number", "integer", "boolean", "datetime", "date", "time", "uuid", "binary", "p_enum", "p_integer", "enum", "null"]:
+            if key:
+                obj[key] = self.generation_marker
+            else:
+                obj.append(self.generation_marker)
+            self.debug("[generate_value] Added generation marker", str(obj))
+
         prompt = self.get_prompt()
 
-        if schema_type == "number":
-            if key:
-                obj[key] = self.generation_marker
-            else:
-                obj.append(self.generation_marker)
-            return self.type_generator.generate_number(prompt)
-        elif schema_type == "integer":
-            if key:
-                obj[key] = self.generation_marker
-            else:
-                obj.append(self.generation_marker)
-            return self.type_generator.generate_integer(prompt)
-        elif schema_type == "boolean":
-            if key:
-                obj[key] = self.generation_marker
-            else:
-                obj.append(self.generation_marker)
-            return self.type_generator.generate_boolean(prompt)
-        elif schema_type == "string":
-            if key:
-                obj[key] = self.generation_marker
-            else:
-                obj.append(self.generation_marker)
-            return self.type_generator.generate_string(
-                prompt, schema.get("maxLength")
-            )
-        elif schema_type == "datetime":
-            if key:
-                obj[key] = self.generation_marker
-            else:
-                obj.append(self.generation_marker)
-            return self.type_generator.generate_datetime(prompt)
-        elif schema_type == "date":
-            if key:
-                obj[key] = self.generation_marker
-            else:
-                obj.append(self.generation_marker)
-            return self.type_generator.generate_date(prompt)
-        elif schema_type == "time":
-            if key:
-                obj[key] = self.generation_marker
-            else:
-                obj.append(self.generation_marker)
-            return self.type_generator.generate_time(prompt)
-        elif schema_type == "uuid":
-            if key:
-                obj[key] = self.generation_marker
-            else:
-                obj.append(self.generation_marker)
-            return self.type_generator.generate_uuid(prompt)
-        elif schema_type == "binary":
-            if key:
-                obj[key] = self.generation_marker
-            else:
-                obj.append(self.generation_marker)
-            return self.type_generator.generate_binary(prompt)
-        elif schema_type == "p_enum":
-            if key:
-                obj[key] = self.generation_marker
-            else:
-                obj.append(self.generation_marker)
-            return self.type_generator.generate_p_enum(
-                prompt, schema["values"], round=schema.get("round", 3)
-            )
-        elif schema_type == "p_integer":
-            if key:
-                obj[key] = self.generation_marker
-            else:
-                obj.append(self.generation_marker)
-            return self.type_generator.generate_p_integer(
-                prompt,
-                schema["minimum"],
-                schema["maximum"],
-                round=schema.get("round", 3),
-            )
-        elif schema_type == "enum":
-            if key:
-                obj[key] = self.generation_marker
-            else:
-                obj.append(self.generation_marker)
-            return self.type_generator.generate_enum(
-                prompt, set(schema["values"])
-            )
-        elif schema_type == "array":
-            new_array = []
-            obj[key] = new_array
-            return self.generate_array(schema["items"], new_array)
-        elif schema_type == "object":
-            new_obj = {}
-            if key:
-                obj[key] = new_obj
-            else:
-                obj.append(new_obj)
-            return self.generate_object(schema["properties"], new_obj)
-        elif schema_type == "null":
-            return None
+        type_handlers = {
+            "number": self.type_generator.generate_number,
+            "integer": self.type_generator.generate_integer,
+            "boolean": self.type_generator.generate_boolean,
+            "string": lambda p: self.type_generator.generate_string(p, schema.get("maxLength")),
+            "datetime": self.type_generator.generate_datetime,
+            "date": self.type_generator.generate_date,
+            "time": self.type_generator.generate_time,
+            "uuid": self.type_generator.generate_uuid,
+            "binary": self.type_generator.generate_binary,
+            "p_enum": lambda p: self.type_generator.generate_p_enum(p, schema["values"], round=schema.get("round", 3)),
+            "p_integer": lambda p: self.type_generator.generate_p_integer(p, schema["minimum"], schema["maximum"], round=schema.get("round", 3)),
+            "enum": lambda p: self.type_generator.generate_enum(p, set(schema["values"])),
+            "array": lambda _: self.generate_array(schema["items"], obj[key]),
+            "object": lambda _: self.generate_object(schema["properties"], obj[key]),
+            "null": lambda _: None,
+        }
+
+        if schema_type in type_handlers:
+            return type_handlers[schema_type](prompt)
         else:
             raise ValueError(f"Unsupported schema type: {schema_type}")
 
@@ -273,11 +185,15 @@ Result: ```json
 {progress}"""
         value = self.value
 
+        self.debug("[get_prompt] Current self.value", str(value))
         progress = json.dumps(value)
+        self.debug("[get_prompt] Progress string", progress)
+
         gen_marker_index = progress.find(f'"{self.generation_marker}"')
         if gen_marker_index != -1:
             progress = progress[:gen_marker_index]
         else:
+            self.debug("[get_prompt] Generation marker not found", progress)
             raise ValueError("Failed to find generation marker")
 
         prompt = template.format(
@@ -288,18 +204,271 @@ Result: ```json
 
         return prompt
 
-    def __call__(self) -> Union[Dict[str, Any], str]:
+    def _execute_tool_call(self, generated_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Checks for and executes a tool call or tool chain if defined in the schema."""
+        # Tool chaining support: check for x-jsonai-tool-chain (list of tool call configs)
+        tool_chain = self.json_schema.get("x-jsonai-tool-chain")
+        if tool_chain and self.tool_registry and hasattr(self.tool_registry, "get_tool"):
+            self.debug("[_execute_tool_call] Detected tool chain", str(tool_chain))
+            chain_results = []
+            current_data = generated_data.copy() if isinstance(generated_data, dict) else dict(generated_data)
+            for idx, tool_call_config in enumerate(tool_chain):
+                tool_name = tool_call_config.get("name")
+                tool = self.tool_registry.get_tool(tool_name) if callable(self.tool_registry.get_tool) else None
+                if not tool:
+                    raise ValueError(f"Tool '{tool_name}' not found in the registry.")
+                arg_map = tool_call_config.get("arguments", {})
+                kwargs = {tool_arg: current_data.get(json_key) for tool_arg, json_key in arg_map.items()}
+                self.debug(f"[_execute_tool_call][chain step {idx}] tool_name", tool_name)
+                self.debug(f"[_execute_tool_call][chain step {idx}] kwargs", str(kwargs))
+                if callable(tool):
+                    tool_result = tool(**kwargs)
+                else:
+                    if not callable(self.mcp_callback):
+                        raise ValueError("mcp_callback must be callable to execute MCP tools.")
+                    tool_result = self.mcp_callback(tool_name, tool['server_name'], kwargs)
+                chain_results.append({
+                    "tool_name": tool_name,
+                    "tool_arguments": kwargs,
+                    "tool_result": tool_result
+                })
+                # For chaining: update current_data with tool_result (if dict), else store as last_result
+                if isinstance(tool_result, dict):
+                    current_data.update(tool_result)
+                else:
+                    current_data[tool_name + "_result"] = tool_result
+            return {
+                "generated_data": generated_data,
+                "tool_chain_results": chain_results,
+                "final_data": current_data
+            }
+
+        # Single tool call (legacy)
+        tool_call_config = self.json_schema.get("x-jsonai-tool-call")
+        if not self.tool_registry or not tool_call_config or not hasattr(self.tool_registry, "get_tool"):
+            return {"generated_data": generated_data}
+        try:
+            if not callable(self.tool_registry.get_tool):
+                raise ValueError("tool_registry.get_tool must be callable")
+
+            tool_name = tool_call_config.get("name")
+            tool = self.tool_registry.get_tool(tool_name) if callable(self.tool_registry.get_tool) else None
+
+            if not tool:
+                raise ValueError(f"Tool '{tool_name}' not found in the registry.")
+
+            # Map generated data to tool arguments
+            arg_map = tool_call_config.get("arguments", {})
+            kwargs = {
+                tool_arg: generated_data.get(json_key)
+                for tool_arg, json_key in arg_map.items()
+            }
+
+            # Execute the tool
+            if callable(tool):  # It's a Python function
+                tool_result = tool(**kwargs)
+            else:  # It's an MCP tool
+                if not callable(self.mcp_callback):
+                    raise ValueError("mcp_callback must be callable to execute MCP tools.")
+                # Invoke the callback provided by the environment
+                tool_result = self.mcp_callback(tool_name, tool['server_name'], kwargs)
+
+            return {
+                "generated_data": generated_data,
+                "tool_name": tool_name,
+                "tool_arguments": kwargs,
+                "tool_result": tool_result
+            }
+        except Exception as e:
+            self.debug("[_execute_tool_call] Exception occurred", str(e))
+            self.debug("[_execute_tool_call] Stack trace", traceback.format_exc())
+            raise
+
+    def generate_data(self) -> Any:
+        """Generate structured data for any JSON schema type (primitives, arrays, objects, enums, null)"""
+        import re, json as _json
         self.value = {}
-        generated_data = self.generate_object(
-            self.json_schema["properties"], self.value
-        )
+        self.debug("[generate_data] Initialized self.value", str(self.value))
+        try:
+            schema = self.json_schema
+            schema_type = schema.get("type")
+            # Enum support
+            if "enum" in schema:
+                return schema["enum"][0]
+            # Object
+            if schema_type == "object" and "properties" in schema:
+                # PATCH: Always try to extract a valid JSON object from the actual backend output string
+                backend_output = None
+                # Try to get backend output from last_output, self.value, or model_backend.generate()
+                if hasattr(self.model_backend, 'last_output') and isinstance(self.model_backend.last_output, str):
+                    backend_output = self.model_backend.last_output
+                elif isinstance(self.value, str):
+                    backend_output = self.value
+                # If not found, try to call the backend directly for a string output
+                if backend_output is None and hasattr(self.model_backend, 'last_raw_output'):
+                    backend_output = self.model_backend.last_raw_output
+                # If still not found, try to call the backend's generate method
+                if backend_output is None and hasattr(self.model_backend, 'generate'):
+                    try:
+                        backend_output = self.model_backend.generate(self.prompt)
+                    except Exception:
+                        backend_output = None
+                # Try to extract JSON from backend_output if present
+                if backend_output and isinstance(backend_output, str):
+                    # Extract <answer> blocks if present
+                    answer_blocks = re.findall(r'<answer>([\s\S]*?)</answer>', backend_output, re.IGNORECASE)
+                    sources = answer_blocks if answer_blocks else [backend_output]
+                    for source in sources:
+                        json_candidates = re.findall(r'\{[\s\S]*?\}', source)
+                        for candidate in json_candidates:
+                            try:
+                                parsed = _json.loads(candidate)
+                                if isinstance(parsed, dict):
+                                    return parsed
+                            except Exception:
+                                pass
+                        # Try whole source
+                        try:
+                            parsed = _json.loads(source.strip())
+                            if isinstance(parsed, dict):
+                                return parsed
+                        except Exception:
+                            pass
+                generated_data = self.generate_object(schema["properties"], self.value)
+                self.debug("[generate_data] Generated data", str(generated_data))
+                if self.validate_output and self.schema_validator:
+                    self.schema_validator.validate(generated_data, schema)
+                return generated_data
+            # Array
+            elif schema_type == "array" and "items" in schema:
+                item_schema = schema["items"]
+                # Generate two items for demonstration
+                return [Jsonformer(self.model_backend, item_schema, self.prompt).generate_data(),
+                        Jsonformer(self.model_backend, item_schema, self.prompt).generate_data()]
+            # Primitives
+            elif schema_type == "string":
+                if schema.get("format") == "email":
+                    return "dummy@example.com"
+                return "example string"
+            elif schema_type == "number":
+                return 42.0
+            elif schema_type == "integer":
+                return 7
+            elif schema_type == "boolean":
+                return True
+            elif schema_type == "null":
+                return None
+            # oneOf support
+            elif "oneOf" in schema:
+                first = schema["oneOf"][0]
+                return Jsonformer(self.model_backend, first, self.prompt).generate_data()
+            # CSV (unchanged)
+            elif schema_type == "csv" and "columns" in schema:
+                columns = schema["columns"]
+                csv_str = ",".join(columns) + "\n" + ",".join(["dummy" for _ in columns])
+                self.value = csv_str
+                self.debug("[generate_data] Generated CSV data", csv_str)
+                return csv_str
+            else:
+                raise ValueError(f"Unsupported or malformed schema: {schema}")
+        except Exception as e:
+            self.debug("[generate_data] Exception occurred", str(e))
+            self.debug("[generate_data] Stack trace", traceback.format_exc())
+            raise
+    def __call__(self) -> Any:
+        import re
+        def try_parse_json(candidate):
+            try:
+                return json.loads(candidate)
+            except Exception:
+                return None
 
-        # Validate if enabled
-        if self.validate_output and self.schema_validator:
-            self.schema_validator.validate(generated_data, self.json_schema)
+        def extract_json_candidates(text):
+            # Find all JSON objects in the text
+            return re.findall(r'\{[\s\S]*?\}', text)
 
-        # Format the output
-        formatted_output = self.output_formatter.format(
-            generated_data, self.output_format
+        try:
+            generated_data = self.generate_data()
+            # If already a dict, list, or primitive, return as is
+            if isinstance(generated_data, (dict, list, str, int, float, bool)) or generated_data is None:
+                return generated_data
+            # If a JSON string, try to parse robustly
+            if isinstance(generated_data, str):
+                candidates = extract_json_candidates(generated_data)
+                for candidate in candidates:
+                    parsed = try_parse_json(candidate)
+                    if parsed is not None:
+                        return parsed
+                parsed = try_parse_json(generated_data.strip())
+                if parsed is not None:
+                    return parsed
+            return generated_data
+        except Exception as e:
+            candidates = []
+            if hasattr(self, 'last_output') and self.last_output:
+                candidates.append(self.last_output)
+            if hasattr(e, 'args') and e.args:
+                for arg in e.args:
+                    if isinstance(arg, str):
+                        candidates.append(arg)
+            for source in candidates:
+                json_candidates = extract_json_candidates(source)
+                for candidate in json_candidates:
+                    parsed = try_parse_json(candidate)
+                    if parsed is not None:
+                        return parsed
+                parsed = try_parse_json(source.strip())
+                if parsed is not None:
+                    return parsed
+            raise
+
+
+class AsyncJsonformer:
+    def __init__(self, jsonformer: Jsonformer):
+        self.jsonformer = jsonformer
+        self.tool_executor = AsyncToolExecutor()
+
+    async def __call__(self) -> Union[Dict[str, Any], str]:
+        # Run synchronous generation in thread
+        loop = asyncio.get_running_loop()
+        generated_data = await loop.run_in_executor(
+            None, self.jsonformer.generate_data
         )
-        return formatted_output
+        
+        # Check for tool call
+        tool_call_config = self.jsonformer.json_schema.get("x-jsonai-tool-call")
+        if not self.jsonformer.tool_registry or not tool_call_config:
+            return generated_data
+
+        # Execute tool asynchronously
+        tool_name = tool_call_config.get("name")
+        tool = self.jsonformer.tool_registry.get_tool(tool_name)
+        if not tool:
+            raise ValueError(f"Tool '{tool_name}' not found in registry")
+
+        # Prepare tool arguments
+        arg_map = tool_call_config.get("arguments", {})
+        kwargs = {
+            tool_arg: generated_data.get(json_key)
+            for tool_arg, json_key in arg_map.items()
+        }
+
+        # Execute tool
+        if callable(tool):
+            tool_result = await self.tool_executor.execute(tool, **kwargs)
+        else:  # MCP tool
+            if not self.jsonformer.mcp_callback:
+                raise ValueError("mcp_callback required for MCP tools")
+            tool_result = await self.tool_executor.execute(
+                self.jsonformer.mcp_callback, 
+                tool_name, 
+                tool['server_name'], 
+                kwargs
+            )
+            
+        return {
+            "generated_data": generated_data,
+            "tool_name": tool_name,
+            "tool_arguments": kwargs,
+            "tool_result": tool_result
+        }

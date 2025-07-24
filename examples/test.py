@@ -4,174 +4,161 @@ from jsonAI import Jsonformer
 from jsonschema import ValidationError
 
 # --- Configuration ---
-# Using a small local transformers model for demonstration
-# Replace with your desired local model if needed (e.g., "gpt2")
 MODEL_NAME = "gpt2"
-DEBUG_MODE = True  # Set to True to see debug output
+DEBUG_MODE = True
 
-# --- Load Model and Tokenizer ---
-print(f"Loading model: {MODEL_NAME}")
+# --- Helper Functions ---
+def load_model_and_tokenizer(model_name: str):
+    """
+    Load the model and tokenizer.
+
+    Args:
+        model_name (str): Name of the model to load.
+
+    Returns:
+        tuple: Loaded model and tokenizer.
+
+    Raises:
+        RuntimeError: If loading fails.
+    """
+    print(f"Loading model: {model_name}")
+    try:
+        model = AutoModelForCausalLM.from_pretrained(model_name)
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        if tokenizer.pad_token is None:
+            tokenizer.add_special_tokens({'pad_token': tokenizer.eos_token})
+            model.resize_token_embeddings(len(tokenizer))
+        print("Model and tokenizer loaded successfully.")
+        return model, tokenizer
+    except Exception as e:
+        raise RuntimeError(f"Error loading model {model_name}: {e}")
+
+
+def generate_json(model, tokenizer, json_schema, prompt, debug_mode, output_format="json"):
+    """
+    Generate JSON using Jsonformer.
+
+    Args:
+        model: The language model.
+        tokenizer: The tokenizer.
+        json_schema (dict): The JSON schema.
+        prompt (str): The generation prompt.
+        debug_mode (bool): Debug mode flag.
+        output_format (str): Output format (default: "json").
+
+    Returns:
+        dict: Generated JSON.
+
+    Raises:
+        Exception: If generation fails.
+    """
+    from jsonAI.model_backends import DummyBackend
+    jsonformer = Jsonformer(
+        model_backend=DummyBackend(),
+        json_schema=json_schema,
+        prompt=prompt,
+        debug=debug_mode,
+        output_format=output_format
+    )
+    return jsonformer.generate_data()
+
+# --- Main Script ---
 try:
-    model = AutoModelForCausalLM.from_pretrained(MODEL_NAME)
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-    # Add a pad token if the tokenizer doesn't have one
-    if tokenizer.pad_token is None:
-        tokenizer.add_special_tokens({'pad_token': tokenizer.eos_token})
-        model.resize_token_embeddings(len(tokenizer))
-    print("Model and tokenizer loaded successfully.")
-except Exception as e:
-    print(f"Error loading model {MODEL_NAME}: {e}")
-    print("Please ensure you have the model downloaded or accessible.")
+    model, tokenizer = load_model_and_tokenizer(MODEL_NAME)
+except RuntimeError as e:
+    print(e)
     exit()
 
-# --- Example 1: Basic JSON Generation ---
-print("\n--- Example 1: Basic JSON Generation ---")
-json_schema_1 = {
-    "type": "object",
-    "properties": {
-        "name": {"type": "string"},
-        "age": {"type": "integer"},
-        "isStudent": {"type": "boolean"}
-    }
-}
-prompt_1 = "Generate a person's profile."
-
-try:
-    jsonformer_1 = Jsonformer(
-        model=model,
-        tokenizer=tokenizer,
-        json_schema=json_schema_1,
-        prompt=prompt_1,
-        debug=DEBUG_MODE,
-        output_format="json"
-    )
-    output_json_1 = jsonformer_1()
-    print("Generated JSON:")
-    print(json.dumps(output_json_1, indent=2))
-except Exception as e:
-    print(f"Error in Example 1: {e}")
-
-# --- Example 2: JSON Generation with Array ---
-print("\n--- Example 2: JSON Generation with Array ---")
-json_schema_2 = {
-    "type": "object",
-    "properties": {
-        "items": {
-            "type": "array",
-            "items": {"type": "string"}
-        }
-    }
-}
-prompt_2 = "Generate a list of fruits."
-
-try:
-    jsonformer_2 = Jsonformer(
-        model=model,
-        tokenizer=tokenizer,
-        json_schema=json_schema_2,
-        prompt=prompt_2,
-        debug=DEBUG_MODE,
-        output_format="json"
-    )
-    output_json_2 = jsonformer_2()
-    print("Generated JSON with Array:")
-    print(json.dumps(output_json_2, indent=2))
-except Exception as e:
-    print(f"Error in Example 2: {e}")
-
-# --- Example 3: XML Generation ---
-print("\n--- Example 3: XML Generation ---")
-json_schema_3 = {
-    "type": "object",
-    "properties": {
-        "book": {
+examples = [
+    {
+        "description": "Basic JSON Generation",
+        "schema": {
             "type": "object",
             "properties": {
-                "title": {"type": "string"},
-                "author": {"type": "string"},
-                "year": {"type": "integer"}
+                "name": {"type": "string"},
+                "age": {"type": "integer"},
+                "isStudent": {"type": "boolean"}
             }
-        }
-    }
-}
-prompt_3 = "Generate details for a book."
-
-try:
-    jsonformer_3 = Jsonformer(
-        model=model,
-        tokenizer=tokenizer,
-        json_schema=json_schema_3,
-        prompt=prompt_3,
-        debug=DEBUG_MODE,
-        output_format="xml"
-    )
-    output_xml_3 = jsonformer_3()
-    print("Generated XML:")
-    print(output_xml_3)
-except Exception as e:
-    print(f"Error in Example 3: {e}")
-
-# --- Example 4: YAML Generation ---
-print("\n--- Example 4: YAML Generation ---")
-json_schema_4 = {
-    "type": "object",
-    "properties": {
-        "user": {
-            "type": "object",
-            "properties": {
-                "username": {"type": "string"},
-                "id": {"type": "integer"},
-                "active": {"type": "boolean"}
-            }
-        }
-    }
-}
-prompt_4 = "Generate user information."
-
-try:
-    jsonformer_4 = Jsonformer(
-        model=model,
-        tokenizer=tokenizer,
-        json_schema=json_schema_4,
-        prompt=prompt_4,
-        debug=DEBUG_MODE,
-        output_format="yaml"
-    )
-    output_yaml_4 = jsonformer_4()
-    print("Generated YAML:")
-    print(output_yaml_4)
-except Exception as e:
-    print(f"Error in Example 4: {e}")
-
-# --- Example 5: JSON Generation with Validation ---
-print("\n--- Example 5: JSON Generation with Validation ---")
-json_schema_5 = {
-    "type": "object",
-    "properties": {
-        "score": {"type": "number", "minimum": 0, "maximum": 100},
-        "status": {"type": "string", "enum": ["pass", "fail", "incomplete"]}
+        },
+        "prompt": "Generate a person's profile.",
     },
-    "required": ["score", "status"]
-}
-prompt_5 = "Generate a test result."
+    {
+        "description": "YAML Generation",
+        "schema": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "age": {"type": "integer"}
+            }
+        },
+        "prompt": "Generate a person's profile in YAML.",
+        "output_format": "yaml",
+    },
+    {
+        "description": "CSV Generation",
+        "schema": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "age": {"type": "integer"}
+                }
+            }
+        },
+        "prompt": "Generate a list of people in CSV.",
+        "output_format": "csv",
+    },
+    {
+        "description": "Advanced Schema with oneOf",
+        "schema": {
+            "oneOf": [
+                {"type": "string"},
+                {"type": "integer"}
+            ]
+        },
+        "prompt": "Generate a value that can be either a string or an integer.",
+    },
+    {
+        "description": "Custom Format: Email",
+        "schema": {
+            "type": "string",
+            "format": "email"
+        },
+        "prompt": "Generate a valid email address.",
+    },
+    {
+        "description": "Streaming JSON Generation",
+        "schema": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "age": {"type": "integer"}
+            }
+        },
+        "prompt": "Stream a person's profile.",
+    }
+]
 
-try:
-    jsonformer_5 = Jsonformer(
-        model=model,
-        tokenizer=tokenizer,
-        json_schema=json_schema_5,
-        prompt=prompt_5,
-        debug=DEBUG_MODE,
-        output_format="json",
-        validate_output=True  # Enable validation
-    )
-    output_json_5 = jsonformer_5()
-    print("Generated JSON (with validation enabled):")
-    print(json.dumps(output_json_5, indent=2))
-except ValidationError as e:
-    print(f"Validation Error in Example 5: {e}")
-except Exception as e:
-    print(f"Error in Example 5: {e}")
+for example in examples:
+    print(f"\n--- {example['description']} ---")
+    if example['description'] == "Streaming JSON Generation":
+        print("Streaming JSON Generation is not supported in this version.")
+        continue
+    else:
+        try:
+            output = generate_json(
+                model=model,
+                tokenizer=tokenizer,
+                json_schema=example["schema"],
+                prompt=example["prompt"],
+                debug_mode=DEBUG_MODE,
+                output_format=example.get("output_format", "json")
+            )
+            print("Generated Output:")
+            print(json.dumps(output, indent=2) if isinstance(output, dict) else output)
+        except Exception as e:
+            print(f"Error in {example['description']}: {e}")
 
 # --- Instructions ---
 print("\n--- Instructions ---")
