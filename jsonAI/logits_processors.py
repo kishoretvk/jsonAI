@@ -1,4 +1,4 @@
-from transformers import PreTrainedTokenizer, StoppingCriteria
+from transformers import PreTrainedTokenizer, StoppingCriteria, LogitsProcessor
 import torch
 
 
@@ -66,7 +66,6 @@ class NumberStoppingCriteria(StoppingCriteria):
 
 
 
-from transformers import LogitsProcessor
 
 class OutputNumbersTokens(LogitsProcessor):
     def __init__(self, tokenizer: PreTrainedTokenizer):
