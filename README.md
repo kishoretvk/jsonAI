@@ -1,39 +1,49 @@
-# jsonAI
+# JsonAI - Production-Ready Structured JSON Generation with LLMs
 
-## Table of Contents
+JsonAI is a comprehensive Python library for generating structured JSON data using Large Language Models (LLMs). It provides enterprise-grade features including robust JSON schema validation, multiple model backends, REST API, React frontend, CLI interface, and production deployment configurations.
 
-- [Features](#features)
-- [Installation](#installation)
-- [Architecture Overview](#architecture-overview)
-- [Testing](#testing)
-- [Examples](#examples)
-  - [Basic JSON Generation](#basic-json-generation)
-  - [XML Output](#xml-output)
-  - [YAML Output](#yaml-output)
-  - [CSV Output](#csv-output)
-  - [CLI Example](#cli-example)
-  - [Tool Calling Example](#tool-calling-example)
-  - [MCP Integration Example](#mcp-integration-example)
-  - [Complex Schema Example](#complex-schema-example)
-  - [Tool Chaining Example](#tool-chaining-example)
-- [Output Format × Type Coverage](#output-format--type-coverage)
-- [Integrations & Capabilities](#integrations--capabilities)
-- [License](#license)
+## 🚀 Features
 
-jsonAI is a Python library for generating structured data based on JSON schemas using pre-trained language models. It supports a wide range of data types and output formats, making it ideal for applications requiring dynamic data generation.
+### Core Capabilities
+- **Multiple LLM Backends**: Support for Ollama, OpenAI, and HuggingFace models
+- **Complete JSON Schema Support**: All JSON schema types including primitives, arrays, objects, enums, and complex nested structures
+- **Performance Optimization**: Advanced caching, batch processing, and async operations
+- **Production Ready**: Docker deployment, Kubernetes configs, monitoring, and scaling
 
-## Features
+### Interfaces & APIs
+- **REST API**: FastAPI-based service with OpenAPI documentation
+- **React Frontend**: Modern web interface for JSON generation
+- **CLI Interface**: Powerful command-line tools for automation and batch processing
+- **Python Library**: Direct programmatic access with async support
 
--   **Dynamic JSON Generation**: Generate JSON objects based on schemas with support for complex types.
--   **Output Formats**: Supports JSON, XML, YAML, and CSV.
--   **Validation**: Validate generated data against schemas.
--   **Tool Integration**: Execute tools based on generated data.
--   **Async Support**: Asynchronous generation and tool execution.
+### Enterprise Features
+- **Caching System**: Intelligent multi-level caching with TTL and LRU strategies
+- **Batch Processing**: Concurrent processing of multiple requests
+- **Performance Monitoring**: Built-in metrics and performance tracking
+- **Schema Validation**: Comprehensive validation with custom rules support
+- **Multiple Output Formats**: JSON, YAML, XML, and CSV support
 
-## Installation
+## 📦 Installation
 
+### Option 1: pip (Recommended)
 ```bash
-pip install jsonAI
+pip install jsonai
+```
+
+### Option 2: From Source
+```bash
+git clone https://github.com/yourusername/JsonAI.git
+cd JsonAI
+poetry install
+```
+
+### Option 3: Docker
+```bash
+# Quick start with Docker
+docker run -p 8000:8000 jsonai:latest
+
+# Full stack with Docker Compose
+docker-compose up -d
 ```
 
 ## Architecture Overview
