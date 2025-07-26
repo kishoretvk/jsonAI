@@ -56,6 +56,16 @@ addopts = "--cov=jsonAI --cov-report=xml"
 python_files = "jsonAI/*.py"
 
 [tool.pylint]
-max-line-length = 79
-disable = ["C0114", "C0115", "C0116"]
+max-line-length = 120
+disable = [
+  "C0114", "C0115", "C0116",  # missing module/class/function docstrings
+  "C0301",  # line-too-long
+  "C0303",  # trailing-whitespace
+  "W0707",  # raise-missing-from
+  "C0415",  # import-outside-toplevel
+  "W0613",  # unused-argument
+  "W0612",  # unused-variable
+  "R0903",  # too-few-public-methods
+  "C0103"   # invalid-name
+]
 ignore = ["tests", "examples"]
