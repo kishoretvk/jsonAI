@@ -85,7 +85,7 @@ class SchemaGenerator:
             ValidationError: If the data does not conform to the schema.
         """
         try:
-            jsonschema_validate(instance=data, schema=schema)
+            jsonschema_validate(data, schema)
             return True
         except ValidationError as e:
             return False

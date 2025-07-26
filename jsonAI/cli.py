@@ -81,7 +81,12 @@ def generate_schema(description, model, use_ollama, ollama_model):
     
     generator = SchemaGenerator(backend)
     schema = generator.generate_schema(description)
+    # Pretty-print schema
     click.echo(json.dumps(schema, indent=2))
+
+# (ensure two blank lines above entry point for lint)
+
+# Entry point
 
 if __name__ == "__main__":
     cli()
