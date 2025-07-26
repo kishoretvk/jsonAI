@@ -1,0 +1,24 @@
+[MASTER]
+ignore=tests,examples
+max-line-length=120
+ 
+[MESSAGES CONTROL]
+disable=
+    C0114, C0115, C0116,    # missing module, class, function docstrings
+    C0301,                 # line too long
+    C0303,                 # trailing whitespace
+    C0410, C0411, C0415,    # import order issues
+    W0404,                 # reimported
+    W0621,                 # redefined-outer-name
+    W0611, W0613, W0612,    # unused imports, unused arguments, unused variables
+    W0707,                 # raise-missing-from
+    W0201,                 # attribute-defined-outside-init
+    W0231,                 # super-init-not-called
+    W0718,                 # broad exception caught
+    R0913, R0902, R0903, R0914, R0911, R0912, R0916, R0917, R1702, R1705, R1710, R1735,  # code complexity
+    R1720,                 # no-else-raise
+    R0801,                 # duplicate-code
+    C0200,                 # consider-using-enumerate
+    C0103,                 # invalid module/class/function name
+    E1101,                 # no-member errors
+    W0622                  # redefined-builtin
