@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "jsonAI"
-version = "0.13.0"  # Incremented from 0.12.4
+version = "0.15.0"  # Production-ready release with REST API, React frontend, performance optimizations, and enterprise features
 description = "A Python library for dynamic JSON generation based on schemas using language models."
 authors = ["1rgs <kishoretvk9@gmail.com>"]
 readme = "README.md"
@@ -20,6 +20,7 @@ ollama = "^0.2.1"
 click = "^8.1.7"
 requests = "^2.32.0"
 aiohttp = "^3.9.5"
+cachetools = "^5.3.1"
 
 [tool.poetry.group.dev.dependencies]
 pandas = "^2.2.2"
