@@ -29,8 +29,11 @@ class PerformanceMonitor:
         """Start timing an operation."""
         self.start_times[operation_id] = time.time()
         
-    def end_operation(self, operation_id: str, 
-                     metadata: Optional[Dict[str, Any]] = None) -> float:
+    def end_operation(
+        self,
+        operation_id: str,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> float:
         """End timing an operation and record metrics."""
         if operation_id not in self.start_times:
             raise ValueError(f"Operation {operation_id} was not started")
@@ -50,7 +53,7 @@ class PerformanceMonitor:
         
     @asynccontextmanager
     async def async_timer(self, operation_id: str, 
-                         metadata: Optional[Dict[str, Any]] = None):
+                          metadata: Optional[Dict[str, Any]] = None):
         """Async context manager for timing operations."""
         self.start_operation(operation_id)
         try:
@@ -93,8 +96,12 @@ class CachedJsonformer(Jsonformer):
         
         self.monitor = PerformanceMonitor()
         
-    def _get_cache_key(self, prompt: str, schema: Dict[str, Any], 
-                      **kwargs) -> str:
+    def _get_cache_key(
+        self,
+        prompt: str,
+        schema: Dict[str, Any],
+        **kwargs,
+    ) -> str:
         """Generate a cache key for the given parameters."""
         # Create a deterministic hash from prompt, schema, and parameters
         content = {
@@ -177,8 +184,11 @@ class CachedJsonformer(Jsonformer):
 class BatchProcessor:
     """Process multiple JSON generation requests efficiently."""
     
-    def __init__(self, jsonformer: Union[Jsonformer, CachedJsonformer],
-                 max_concurrent: int = 5):
+    def __init__(
+        self,
+        jsonformer: Union[Jsonformer, CachedJsonformer],
+        max_concurrent: int = 5,
+    ):
         self.jsonformer = jsonformer
         self.max_concurrent = max_concurrent
         self.monitor = PerformanceMonitor()
@@ -271,12 +281,13 @@ class OptimizedJsonformer(CachedJsonformer):
                 # Ignore errors during warmup
                 pass
                 
-    async def generate_batch_async(self, 
-                                  requests: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    async def generate_batch_async(
+        self,
+        requests: List[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
         """Generate multiple JSON responses efficiently."""
         if not self.enable_batch_processing:
             raise ValueError("Batch processing is disabled")
-            
         return await self.batch_processor.process_batch(requests)
         
     def generate_batch(self, requests: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

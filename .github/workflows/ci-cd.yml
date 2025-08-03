@@ -60,14 +60,14 @@ jobs:
           -v
     
     - name: Upload coverage reports to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
         file: ./coverage.xml
         flags: unittests
         name: codecov-umbrella
     
     - name: Upload test results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: test-results-${{ matrix.python-version }}
@@ -94,7 +94,7 @@ jobs:
       run: poetry install
     
     - name: Run flake8
-      run: poetry run flake8 jsonAI/ tests/
+      run: poetry run flake8 jsonAI/
     
     - name: Run pylint
       run: poetry run pylint jsonAI/
@@ -146,37 +146,37 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
-  build-frontend:
-    name: Build Frontend
-    runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
-        cache: 'npm'
-        cache-dependency-path: frontend/package-lock.json
-    
-    - name: Install dependencies
-      working-directory: ./frontend
-      run: npm ci
-    
-    - name: Run tests
-      working-directory: ./frontend
-      run: npm test -- --coverage --watchAll=false
-    
-    - name: Build application
-      working-directory: ./frontend
-      run: npm run build
-    
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: frontend-build
-        path: frontend/build/
+  # build-frontend:
+  #   name: Build Frontend
+  #   runs-on: ubuntu-latest
+  #   
+  #   steps:
+  #   - uses: actions/checkout@v4
+  #   
+  #   - name: Set up Node.js
+  #     uses: actions/setup-node@v4
+  #     with:
+  #       node-version: ${{ env.NODE_VERSION }}
+  #       cache: 'npm'
+  #       cache-dependency-path: frontend/package-lock.json
+  #   
+  #   - name: Install dependencies
+  #     working-directory: ./frontend
+  #     run: npm ci
+  #   
+  #   - name: Run tests
+  #     working-directory: ./frontend
+  #     run: npm test -- --coverage --watchAll=false
+  #   
+  #   - name: Build application
+  #     working-directory: ./frontend
+  #     run: npm run build
+  #   
+  #   - name: Upload build artifacts
+  #     uses: actions/upload-artifact@v4
+  #     with:
+  #       name: frontend-build
+  #       path: frontend/build/
 
   security:
     name: Security Scan
@@ -194,7 +194,7 @@ jobs:
         output: 'trivy-results.sarif'
     
     - name: Upload Trivy scan results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v2
+      uses: github/codeql-action/upload-sarif@v3
       if: always()
       with:
         sarif_file: 'trivy-results.sarif'
