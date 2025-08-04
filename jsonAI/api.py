@@ -17,9 +17,9 @@ from datetime import datetime
 import logging
 
 from .main import Jsonformer
-from .async_generation import AsyncJsonformer
+from .async_jsonformer import AsyncJsonformer
 from .performance import OptimizedJsonformer, PerformanceMonitor
-from .model_backends import get_model_and_tokenizer
+# from .model_backends import get_model_and_tokenizer  # removed: symbol not present; adapted below
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -108,9 +108,11 @@ async def get_jsonformer(request: GenerationRequest) -> Union[Jsonformer, Optimi
         try:
             # Get model and tokenizer
             if cache_key not in _model_cache:
-                model, tokenizer = get_model_and_tokenizer(
-                    request.model_name, 
-                    request.model_path
+                # Resolve model/tokenizer using ModelFactory to avoid missing import
+                from .model_backends import ModelFactory  # type: ignore
+                model, tokenizer = ModelFactory.resolve(
+                    provider=request.model_name,
+                    model_path=request.model_path
                 )
                 _model_cache[cache_key] = (model, tokenizer)
             else:
@@ -205,9 +207,10 @@ async def generate_json_async(request: GenerationRequest):
         cache_key = f"{request.model_name}:{request.model_path}"
         
         if cache_key not in _model_cache:
-            model, tokenizer = get_model_and_tokenizer(
-                request.model_name, 
-                request.model_path
+            from .model_backends import ModelFactory  # type: ignore
+            model, tokenizer = ModelFactory.resolve(
+                provider=request.model_name,
+                model_path=request.model_path
             )
             _model_cache[cache_key] = (model, tokenizer)
         else:
