@@ -1,5 +1,11 @@
 import unittest
-from unittest.mock import patch, MagicMock
+import importlib.util
+import pytest
+
+# Skip the whole module if openai is not installed (optional dependency)
+if importlib.util.find_spec("openai") is None:
+    pytest.skip("openai not installed; skipping OpenAIBackend tests", allow_module_level=True)
+
 from jsonAI.model_backends import OpenAIBackend
 import asyncio
 
