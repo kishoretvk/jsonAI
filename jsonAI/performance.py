@@ -15,7 +15,7 @@ import hashlib
 from contextlib import asynccontextmanager
 
 from .main import Jsonformer
-from .async_generation import AsyncJsonformer
+from .async_jsonformer import AsyncJsonformer
 
 
 class PerformanceMonitor:
