@@ -8,6 +8,7 @@ if importlib.util.find_spec("openai") is None:
 
 from jsonAI.model_backends import OpenAIBackend
 import asyncio
+from unittest.mock import patch, MagicMock
 
 class TestOpenAIBackend(unittest.TestCase):
     def setUp(self):

@@ -38,11 +38,11 @@ jobs:
     - name: Lint with pylint
       run: poetry run pylint jsonAI
 
-    - name: Test with pytest and Coverage
-      run: poetry run pytest jsonAI tests --cov=jsonAI --cov-report=xml
+    - name: Test with pytest and Coverage (default job, may skip OpenAI tests if openai not installed)
+      run: poetry run pytest jsonAI tests --cov=jsonAI --cov-report=xml -v
 
     - name: Run Integration Tests
-      run: poetry run pytest examples --cov=jsonAI --cov-report=xml
+      run: poetry run pytest examples --cov=jsonAI --cov-report=xml -v
 
     - name: Generate Local Coverage Report
       run: poetry run coverage report
@@ -50,3 +50,26 @@ jobs:
     - name: Handle Test Failures
       if: failure()
       run: echo "Tests failed. Please review the logs."
+
+  openai-backend-tests:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install Poetry
+      run: pip install poetry
+
+    - name: Install deps with dev group
+      run: poetry install --with dev
+
+    - name: Install optional openai dependency
+      run: poetry run pip install "openai>=1.40.0"
+
+    - name: Run only OpenAI backend tests
+      run: poetry run pytest tests/test_openai_backend.py -v
