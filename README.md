@@ -1,27 +1,43 @@
-# JsonAI - Production-Ready Structured JSON Generation with LLMs
+# JsonAI — Production-Ready Structured JSON Generation with LLMs
 
 JsonAI is a comprehensive Python library for generating structured JSON data using Large Language Models (LLMs). It provides enterprise-grade features including robust JSON schema validation, multiple model backends, REST API, React frontend, CLI interface, and production deployment configurations.
+
+Current version: 0.15.1
+
+## 🔔 What’s New in 0.15.1
+
+- Stabilized FastAPI REST API with endpoints for sync/async generation, batch processing, stats, cache management, and schema validation
+- Performance suite:
+  - PerformanceMonitor async timing fixes
+  - CachedJsonformer with LRU/TTL caching
+  - BatchProcessor for efficient concurrent execution
+  - OptimizedJsonformer combines caching + batch processing with warmup
+- Async generation improvements:
+  - FullAsyncJsonformer (aliased as AsyncJsonformer in the API)
+  - AsyncJsonformer wrapper in main.py for async tool execution
+- Logging hygiene: lazy logging interpolation to reduce overhead
+- Packaging: PyPI publish flow cleaned; version bumped to 0.15.1
 
 ## 🚀 Features
 
 ### Core Capabilities
-- **Multiple LLM Backends**: Support for Ollama, OpenAI, and HuggingFace models
-- **Complete JSON Schema Support**: All JSON schema types including primitives, arrays, objects, enums, and complex nested structures
-- **Performance Optimization**: Advanced caching, batch processing, and async operations
-- **Production Ready**: Docker deployment, Kubernetes configs, monitoring, and scaling
+- Multiple LLM Backends: Ollama, OpenAI, and HuggingFace Transformers
+- Full JSON Schema Coverage: primitives, arrays, objects, enums, nested structures, oneOf
+- Performance Optimization: caching (LRU/TTL), batch processing, async operations
+- Production Ready: Docker, FastAPI, monitoring, scaling considerations
 
 ### Interfaces & APIs
-- **REST API**: FastAPI-based service with OpenAPI documentation
-- **React Frontend**: Modern web interface for JSON generation
-- **CLI Interface**: Powerful command-line tools for automation and batch processing
-- **Python Library**: Direct programmatic access with async support
+- REST API: FastAPI-based service with OpenAPI docs
+- React Frontend: Modern web interface for JSON generation
+- CLI Interface: Command-line tools for automation and batch processing
+- Python Library: Programmatic access with sync and async support
 
 ### Enterprise Features
-- **Caching System**: Intelligent multi-level caching with TTL and LRU strategies
-- **Batch Processing**: Concurrent processing of multiple requests
-- **Performance Monitoring**: Built-in metrics and performance tracking
-- **Schema Validation**: Comprehensive validation with custom rules support
-- **Multiple Output Formats**: JSON, YAML, XML, and CSV support
+- Caching System: Intelligent multi-level caching (LRU/TTL)
+- Batch Processing: Concurrent batch execution
+- Performance Monitoring: Built-in metrics via PerformanceMonitor
+- Schema Validation: Comprehensive validation with jsonschema
+- Multiple Output Formats: JSON, YAML, XML, and CSV
 
 ## 📦 Installation
 
@@ -50,12 +66,14 @@ docker-compose up -d
 
 The `jsonAI` library is modular and consists of the following components:
 
--   **`Jsonformer`**: Orchestrates the generation process, handles output formatting, and validates data.
--   **`TypeGenerator`**: Generates values for individual data types.
--   **`OutputFormatter`**: Converts generated data into the desired format.
--   **`SchemaValidator`**: Validates data against JSON schemas.
--   **`ToolRegistry`**: Manages tools for execution.
--   **`AsyncJsonformer`**: Provides asynchronous support for generation and tool execution.
+- **Jsonformer** (jsonAI.main): Orchestrates generation, formatting, and validation
+- **TypeGenerator**: Generates values for each JSON Schema type
+- **OutputFormatter**: Converts data into JSON, YAML, XML, CSV
+- **SchemaValidator**: Validates data with jsonschema
+- **ToolRegistry**: Registers and resolves Python/MCP tools
+- **Async Paths**:
+  - **FullAsyncJsonformer** (jsonAI.async_jsonformer): asynchronous generator taking model_backend, json_schema, prompt (aliased as AsyncJsonformer in API)
+  - **AsyncJsonformer wrapper** (jsonAI.main): wraps a Jsonformer instance for async tool execution
 
 ## Testing
 
@@ -70,16 +88,64 @@ To run tests:
 pytest tests/
 ```
 
+## Quick API Start (FastAPI)
+
+Run the API with uvicorn:
+
+```bash
+uvicorn jsonAI.api:app --host 0.0.0.0 --port 8000
+```
+
+Then open http://localhost:8000/docs for interactive Swagger UI.
+
+### REST Endpoints
+
+- POST /generate — synchronous generation
+- POST /generate/async — asynchronous generation
+- POST /generate/batch — concurrent batch generation
+- GET /stats — performance and cache statistics
+- DELETE /cache — clear all caches
+- POST /validate — validate a JSON schema
+
+Minimal cURL examples:
+
+```bash
+# Sync generate
+curl -X POST http://localhost:8000/generate -H "Content-Type: application/json" -d '{
+  "prompt": "Generate a simple user object",
+  "schema": {"type":"object","properties":{"name":{"type":"string"},"age":{"type":"integer"}}},
+  "model_name": "ollama",
+  "model_path": "llama3"
+}'
+
+# Async generate
+curl -X POST http://localhost:8000/generate/async -H "Content-Type: application/json" -d '{
+  "prompt": "Generate a simple user object",
+  "schema": {"type":"object","properties":{"name":{"type":"string"},"age":{"type":"integer"}}},
+  "model_name": "ollama",
+  "model_path": "llama3"
+}'
+
+# Batch generate
+curl -X POST http://localhost:8000/generate/batch -H "Content-Type: application/json" -d '{
+  "requests": [
+    {"prompt":"User 1","schema":{"type":"object","properties":{"name":{"type":"string"}}},"model_name":"ollama","model_path":"llama3"},
+    {"prompt":"User 2","schema":{"type":"object","properties":{"name":{"type":"string"}}},"model_name":"ollama","model_path":"llama3"}
+  ],
+  "max_concurrent": 5
+}'
+```
+
 ## Examples
 
 ### Basic JSON Generation
 
 ```python
-from transformers import AutoModelForCausalLM, AutoTokenizer
 from jsonAI.main import Jsonformer
 
-model = AutoModelForCausalLM.from_pretrained("gpt2")
-tokenizer = AutoTokenizer.from_pretrained("gpt2")
+# Suppose you have a backend that implements ModelBackend
+from jsonAI.model_backends import DummyBackend
+backend = DummyBackend()  # replace with OllamaBackend/OpenAIBackend/etc.
 
 schema = {
     "type": "object",
@@ -89,9 +155,8 @@ schema = {
         "isStudent": {"type": "boolean"}
     }
 }
-
 prompt = "Generate a person's profile."
-jsonformer = Jsonformer(model, tokenizer, schema, prompt)
+jsonformer = Jsonformer(model_backend=backend, json_schema=schema, prompt=prompt)
 output = jsonformer()
 print(output)
 ```
@@ -109,7 +174,7 @@ schema = {
     }
 }
 prompt = "Generate a city profile."
-jsonformer = Jsonformer(model, tokenizer, schema, prompt, output_format="yaml")
+jsonformer = Jsonformer(model_backend=backend, json_schema=schema, prompt=prompt, output_format="yaml")
 output = jsonformer()
 print(output)
 ```
@@ -128,7 +193,7 @@ schema = {
     }
 }
 prompt = "Generate a list of students and their scores."
-jsonformer = Jsonformer(model, tokenizer, schema, prompt, output_format="csv")
+jsonformer = Jsonformer(model_backend=backend, json_schema=schema, prompt=prompt, output_format="csv")
 output = jsonformer()
 print(output)
 ```
@@ -145,7 +210,9 @@ python -m jsonAI.cli generate --schema schema.json --prompt "Generate a product"
 #### Using Ollama Backend (Recommended for LLMs)
 
 ```bash
-python -m jsonAI.cli generate --schema complex_schema.json --prompt "Generate a comprehensive person profile as JSON." --use-ollama --ollama-model qwen3:1.7b
+python -m jsonAI.cli generate --schema complex_schema.json \
+  --prompt "Generate a comprehensive person profile as JSON." \
+  --use-ollama --ollama-model llama3
 ```
 
 #### Features
@@ -201,7 +268,7 @@ schema = {
     }
 }
 prompt = "Generate a user email."
-jsonformer = Jsonformer(model, tokenizer, schema, prompt, tool_registry=tool_registry)
+jsonformer = Jsonformer(model_backend=backend, json_schema=schema, prompt=prompt, tool_registry=tool_registry)
 output = jsonformer()
 print(output)
 ```
@@ -223,7 +290,7 @@ schema = {
         "arguments": {"query": "query"}
     }
 }
-jsonformer = Jsonformer(model, tokenizer, schema, prompt, mcp_callback=mcp_callback)
+jsonformer = Jsonformer(model_backend=backend, json_schema=schema, prompt=prompt, mcp_callback=mcp_callback)
 output = jsonformer()
 print(output)
 ```
@@ -280,7 +347,7 @@ schema = {
 }
 
 prompt = "Generate details for a book."
-jsonformer = Jsonformer(model, tokenizer, schema, prompt, output_format="xml")
+jsonformer = Jsonformer(model_backend=backend, json_schema=schema, prompt=prompt, output_format="xml")
 output = jsonformer()
 print(output)
 ```
@@ -337,6 +404,50 @@ print(result)
 # Output will include all intermediate and final tool results.
 ```
 
+## Performance and Caching
+
+JsonAI includes a performance suite to optimize throughput and latency.
+
+- **PerformanceMonitor**: measures durations for operations (async-safe)
+- **CachedJsonformer**: two-level caching
+  - LRU cache for simple schema-based results
+  - TTL cache for prompt-based entries for complex schemas
+- **OptimizedJsonformer**: all performance features plus cache warmup and batch helpers
+- **BatchProcessor**: asynchronous concurrent processing (configurable semaphore)
+
+Example:
+
+```python
+from jsonAI.performance import OptimizedJsonformer
+from jsonAI.model_backends import DummyBackend
+
+backend = DummyBackend()
+schema = {"type":"object","properties":{"name":{"type":"string"}}}
+
+jsonformer = OptimizedJsonformer(
+    model=backend,          # accepts a ModelBackend
+    tokenizer=backend.tokenizer,
+    schema=schema,
+    cache_size=1000,
+    cache_ttl=3600
+)
+
+# Single generation (cached)
+print(jsonformer.generate("Generate a name"))
+
+# Batch generation
+requests = [
+  {"prompt":"User A","kwargs":{}},
+  {"prompt":"User B","kwargs":{}}
+]
+print(jsonformer.generate_batch(requests))
+```
+
+To inspect performance and cache stats at runtime, use the REST API `GET /stats` or:
+```python
+jsonformer.get_comprehensive_stats()
+```
+
 ## Output Format × Type Coverage
 
 
@@ -365,10 +476,12 @@ print(result)
 
 ## Integrations & Capabilities
 
-- **LLM Integration**: Use with HuggingFace Transformers, OpenAI, vLLM, Ollama, etc.
-- **FastAPI**: Serve generation endpoints via FastAPI (see `examples/fastapi_example.py`).
-- **Tool Registry**: Register and call Python or MCP tools from schemas.
-- **Async Support**: Use `AsyncJsonformer` for async workflows.
+- LLMs: HuggingFace Transformers, OpenAI, Ollama (vLLM patterns apply)
+- FastAPI: See `jsonAI/api.py` and `examples/fastapi_example.py`
+- Tool Registry: Register and call Python or MCP tools from schemas; supports tool chaining via `x-jsonai-tool-chain`
+- Async Support:
+  - `FullAsyncJsonformer` for async generation with `model_backend/json_schema/prompt`
+  - `AsyncJsonformer` wrapper (jsonAI.main) for async tool execution
 
 See the [examples/](examples/) directory for more advanced usage and integration patterns.
 
@@ -376,23 +489,38 @@ See the [examples/](examples/) directory for more advanced usage and integration
 
 This project is licensed under the MIT License.
 
+## Deployment
+
+- API:
+  - `uvicorn jsonAI.api:app --host 0.0.0.0 --port 8000`
+  - CORS is enabled by default for development; harden for production
+- Docker:
+  - `docker build -t jsonai:latest .`
+  - `docker run -p 8000:8000 jsonai:latest`
+- Docker Compose:
+  - `docker-compose up -d`
+- See `docs/deployment.md` for more
+
+## Versioning and Release
+
+PyPI forbids reusing the same filename for the same version. Always bump the version:
+
+```bash
+poetry version patch  # or minor/major
+poetry build
+poetry publish -u __token__ -p $PYPI_TOKEN
+```
+
+Automate in CI by bumping on tags and using repository secrets for tokens.
+
 ## Streaming Support
 
-jsonAI now supports streaming data generation for real-time applications. Use the `stream_generate_data` method in `Jsonformer` or `AsyncJsonformer` to generate data incrementally.
-
-### Example
+JsonAI supports streaming data generation (experimental API in examples). Example pattern:
 
 ```python
-# Streaming with Jsonformer
 jsonformer = Jsonformer(model_backend, json_schema, prompt)
 for data_chunk in jsonformer.stream_generate_data():
     print(data_chunk)
-
-# Streaming with AsyncJsonformer
-async def async_stream():
-    async_jsonformer = AsyncJsonformer(jsonformer)
-    async for data_chunk in async_jsonformer.stream_generate_data():
-        print(data_chunk)
-
-asyncio.run(async_stream())
 ```
+
+For async streaming, adapt the pattern with the async wrapper as needed.
