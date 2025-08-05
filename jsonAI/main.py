@@ -284,93 +284,116 @@ Result: ```json
             self.debug("[_execute_tool_call] Stack trace", traceback.format_exc())
             raise
 
+    def _try_extract_json_from_backend_output(self, backend_output: str) -> Optional[Dict[str, Any]]:
+        """Attempt to parse a dict JSON object from a raw backend output string."""
+        import re, json as _json
+        # Extract <answer> blocks if present
+        answer_blocks = re.findall(r'<answer>([\s\S]*?)</answer>', backend_output, re.IGNORECASE)
+        sources = answer_blocks if answer_blocks else [backend_output]
+        for source in sources:
+            json_candidates = re.findall(r'\{[\s\S]*?\}', source)
+            for candidate in json_candidates:
+                try:
+                    parsed = _json.loads(candidate)
+                    if isinstance(parsed, dict):
+                        return parsed
+                except Exception:
+                    pass
+            # Try whole source
+            try:
+                parsed = _json.loads(source.strip())
+                if isinstance(parsed, dict):
+                    return parsed
+            except Exception:
+                pass
+        return None
+
+    def _generate_for_object(self, schema: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate data for object schemas, including robust backend JSON extraction."""
+        self.value = {}
+        # Try to pull raw backend output if available and parse JSON out of it
+        backend_output = None
+        if hasattr(self.model_backend, 'last_output') and isinstance(self.model_backend.last_output, str):
+            backend_output = self.model_backend.last_output
+        elif isinstance(self.value, str):
+            backend_output = self.value
+        if backend_output is None and hasattr(self.model_backend, 'last_raw_output'):
+            backend_output = self.model_backend.last_raw_output
+        if backend_output is None and hasattr(self.model_backend, 'generate'):
+            try:
+                backend_output = self.model_backend.generate(self.prompt)
+            except Exception:
+                backend_output = None
+        if backend_output and isinstance(backend_output, str):
+            parsed = self._try_extract_json_from_backend_output(backend_output)
+            if isinstance(parsed, dict):
+                return parsed
+
+        generated_data = self.generate_object(schema["properties"], self.value)
+        self.debug("[generate_data] Generated data", str(generated_data))
+        if self.validate_output and self.schema_validator:
+            self.schema_validator.validate(generated_data, schema)
+        return generated_data
+
+    def _generate_for_array(self, schema: Dict[str, Any]) -> list:
+        """Generate data for array schemas (simple demo returns two items)."""
+        item_schema = schema["items"]
+        return [
+            Jsonformer(self.model_backend, item_schema, self.prompt).generate_data(),
+            Jsonformer(self.model_backend, item_schema, self.prompt).generate_data(),
+        ]
+
+    def _generate_for_primitives(self, schema: Dict[str, Any]) -> Any:
+        """Generate data for primitive types."""
+        schema_type = schema.get("type")
+        if schema_type == "string":
+            if schema.get("format") == "email":
+                return "dummy@example.com"
+            return "example string"
+        if schema_type == "number":
+            return 42.0
+        if schema_type == "integer":
+            return 7
+        if schema_type == "boolean":
+            return True
+        if schema_type == "null":
+            return None
+        raise ValueError(f"Unsupported primitive schema: {schema_type}")
+
     def generate_data(self) -> Any:
         """Generate structured data for any JSON schema type (primitives, arrays, objects, enums, null)"""
-        import re, json as _json
+        import json as _json
         self.value = {}
         self.debug("[generate_data] Initialized self.value", str(self.value))
         try:
             schema = self.json_schema
             schema_type = schema.get("type")
+
             # Enum support
             if "enum" in schema:
                 return schema["enum"][0]
-            # Object
+
             if schema_type == "object" and "properties" in schema:
-                # PATCH: Always try to extract a valid JSON object from the actual backend output string
-                backend_output = None
-                # Try to get backend output from last_output, self.value, or model_backend.generate()
-                if hasattr(self.model_backend, 'last_output') and isinstance(self.model_backend.last_output, str):
-                    backend_output = self.model_backend.last_output
-                elif isinstance(self.value, str):
-                    backend_output = self.value
-                # If not found, try to call the backend directly for a string output
-                if backend_output is None and hasattr(self.model_backend, 'last_raw_output'):
-                    backend_output = self.model_backend.last_raw_output
-                # If still not found, try to call the backend's generate method
-                if backend_output is None and hasattr(self.model_backend, 'generate'):
-                    try:
-                        backend_output = self.model_backend.generate(self.prompt)
-                    except Exception:
-                        backend_output = None
-                # Try to extract JSON from backend_output if present
-                if backend_output and isinstance(backend_output, str):
-                    # Extract <answer> blocks if present
-                    answer_blocks = re.findall(r'<answer>([\s\S]*?)</answer>', backend_output, re.IGNORECASE)
-                    sources = answer_blocks if answer_blocks else [backend_output]
-                    for source in sources:
-                        json_candidates = re.findall(r'\{[\s\S]*?\}', source)
-                        for candidate in json_candidates:
-                            try:
-                                parsed = _json.loads(candidate)
-                                if isinstance(parsed, dict):
-                                    return parsed
-                            except Exception:
-                                pass
-                        # Try whole source
-                        try:
-                            parsed = _json.loads(source.strip())
-                            if isinstance(parsed, dict):
-                                return parsed
-                        except Exception:
-                            pass
-                generated_data = self.generate_object(schema["properties"], self.value)
-                self.debug("[generate_data] Generated data", str(generated_data))
-                if self.validate_output and self.schema_validator:
-                    self.schema_validator.validate(generated_data, schema)
-                return generated_data
-            # Array
-            elif schema_type == "array" and "items" in schema:
-                item_schema = schema["items"]
-                # Generate two items for demonstration
-                return [Jsonformer(self.model_backend, item_schema, self.prompt).generate_data(),
-                        Jsonformer(self.model_backend, item_schema, self.prompt).generate_data()]
-            # Primitives
-            elif schema_type == "string":
-                if schema.get("format") == "email":
-                    return "dummy@example.com"
-                return "example string"
-            elif schema_type == "number":
-                return 42.0
-            elif schema_type == "integer":
-                return 7
-            elif schema_type == "boolean":
-                return True
-            elif schema_type == "null":
-                return None
-            # oneOf support
-            elif "oneOf" in schema:
+                return self._generate_for_object(schema)
+
+            if schema_type == "array" and "items" in schema:
+                return self._generate_for_array(schema)
+
+            if schema_type in {"string", "number", "integer", "boolean", "null"}:
+                return self._generate_for_primitives(schema)
+
+            if "oneOf" in schema:
                 first = schema["oneOf"][0]
                 return Jsonformer(self.model_backend, first, self.prompt).generate_data()
-            # CSV (unchanged)
-            elif schema_type == "csv" and "columns" in schema:
+
+            if schema_type == "csv" and "columns" in schema:
                 columns = schema["columns"]
                 csv_str = ",".join(columns) + "\n" + ",".join(["dummy" for _ in columns])
                 self.value = csv_str
                 self.debug("[generate_data] Generated CSV data", csv_str)
                 return csv_str
-            else:
-                raise ValueError(f"Unsupported or malformed schema: {schema}")
+
+            raise ValueError(f"Unsupported or malformed schema: {schema}")
         except Exception as e:
             self.debug("[generate_data] Exception occurred", str(e))
             self.debug("[generate_data] Stack trace", traceback.format_exc())
