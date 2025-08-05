@@ -1,5 +1,5 @@
 import asyncio
-from typing import Callable, Any, Dict
+from typing import Callable, Any, Dict, Awaitable, List
 from functools import partial
 
 class ToolExecutionError(Exception):
@@ -9,9 +9,12 @@ class AsyncToolExecutor:
     def __init__(self, max_retries: int = 3, backoff_factor: float = 0.5):
         self.max_retries = max_retries
         self.backoff_factor = backoff_factor
-        self.pending_tasks = []
+        # Track pending asyncio tasks; explicit type for mypy
+        self.pending_tasks: List[asyncio.Task[Any]] = []
+        # Track failed results from run_all for postmortem (optional)
+        self.failed_tasks: List[Exception] = []
         
-    async def execute(self, tool_func: Callable, *args, **kwargs) -> Any:
+    async def execute(self, tool_func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
         """Execute a tool function with retry logic and detailed error reporting."""
         for attempt in range(self.max_retries):
             try:
@@ -26,21 +29,22 @@ class AsyncToolExecutor:
                     raise ToolExecutionError(f"Tool '{tool_func.__name__}' failed after {self.max_retries} attempts: {e}")
                 await asyncio.sleep(self.backoff_factor * (2 ** attempt))
 
-    def add_task(self, tool_func: Callable, *args, **kwargs):
+    def add_task(self, tool_func: Callable[..., Any], *args: Any, **kwargs: Any) -> None:
         """Add a tool execution task to the queue"""
-        task = self.execute(tool_func, *args, **kwargs)
+        # Wrap coroutine in an actual Task to ensure scheduling and typing clarity
+        task = asyncio.create_task(self.execute(tool_func, *args, **kwargs))
         self.pending_tasks.append(task)
         
-    async def run_all(self) -> list:
+    async def run_all(self) -> list[Any]:
         """Execute all pending tasks concurrently and retain failed tasks for analysis."""
-        results = await asyncio.gather(*self.pending_tasks, return_exceptions=True)
-        self.failed_tasks = [task for task in results if isinstance(task, Exception)]
+        results: list[Any] = await asyncio.gather(*self.pending_tasks, return_exceptions=True)
+        self.failed_tasks = [exc for exc in results if isinstance(exc, Exception)]
         self.pending_tasks = []
         return results
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "AsyncToolExecutor":
         return self
 
-    async def __aexit__(self, exc_type, exc, tb):
+    async def __aexit__(self, exc_type, exc, tb) -> None:
         if self.pending_tasks:
             await self.run_all()

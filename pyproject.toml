@@ -72,3 +72,12 @@ disable = [
   "C0103"   # invalid-name
 ]
 ignore = ["tests", "examples"]
+
+[tool.mypy]
+python_version = "3.11"
+strict_optional = true
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = ["jsonschema", "yaml", "requests", "openai", "torch", "transformers", "cachetools"]
+ignore_missing_imports = true

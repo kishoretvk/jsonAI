@@ -1,6 +1,6 @@
 import torch
 import re
-from typing import Union, Callable, List
+from typing import Union, Callable, List, Optional, Any
 from transformers import PreTrainedModel, PreTrainedTokenizer
 from jsonAI.model_backends import ModelBackend
 from jsonAI.logits_processors import (
@@ -49,7 +49,7 @@ class TypeGenerator:
     def __init__(
         self,
         model_backend: ModelBackend,
-        debug: Callable,
+        debug: Callable[..., None],
         max_number_tokens: int = 6,
         max_string_token_length: int = 175,
         temperature: float = 1.0,
@@ -72,6 +72,10 @@ class TypeGenerator:
         self.max_number_tokens = max_number_tokens
         self.max_string_token_length = max_string_token_length
         self.temperature = temperature
+        # Optional helpers depending on backend capabilities
+        self.type_prefix_tokens: Optional[dict[str, list[str]]] = None
+        self.number_logit_processor: Optional[Any] = None
+        self.integer_logit_processor: Optional[Any] = None
 
         self.debug("[TypeGenerator.__init__] Initialized debug", str(debug))
 
@@ -79,20 +83,16 @@ class TypeGenerator:
             self.type_prefix_tokens = get_prefix_tokens_for_types(self.model_backend.tokenizer)
             self.number_logit_processor = OutputNumbersTokens(self.model_backend.tokenizer)
             self.integer_logit_processor = OutputIntegersTokens(self.model_backend.tokenizer)
-        else:
-            self.type_prefix_tokens = None
-            self.number_logit_processor = None
-            self.integer_logit_processor = None
 
     def _generate_with_processor(
         self,
         prompt: str,
         max_tokens: int,
-        logits_processor=None,
-        stopping_criteria=None,
-        temperature=None,
-        post_process: Callable = None,
-        iterations=0
+        logits_processor: Optional[Any] = None,
+        stopping_criteria: Optional[Any] = None,
+        temperature: Optional[float] = None,
+        post_process: Optional[Callable[[str], Any]] = None,
+        iterations: int = 0
     ):
         """
         Shared generation logic with processor and criteria.
@@ -148,7 +148,7 @@ class TypeGenerator:
                     raise RuntimeError(f"Generation failed after retries: {e}")
 
     def generate_number(
-        self, prompt: str, temperature: Union[float, None] = None, iterations=0
+        self, prompt: str, temperature: Optional[float] = None, iterations: int = 0
     ) -> float:
         """Generate a floating point number from the model."""
         try:
@@ -209,7 +209,7 @@ class TypeGenerator:
             )
 
     def generate_integer(
-        self, prompt: str, temperature: Union[float, None] = None, iterations=0
+        self, prompt: str, temperature: Optional[float] = None, iterations: int = 0
     ) -> int:
         """Generate an integer from the model."""
         try:
@@ -315,7 +315,7 @@ class TypeGenerator:
             )
             return response
 
-    def generate_string(self, prompt: str, maxLength=None) -> str:
+    def generate_string(self, prompt: str, maxLength: Optional[int] = None) -> str:
         """Generate a string value from the model.
 
         Args:
@@ -335,15 +335,16 @@ class TypeGenerator:
 
         if hasattr(self.model_backend, "tokenizer"):
             input_tokens = self.model_backend.tokenizer.encode(prompt, return_tensors="pt").to(
-                self.model_backend.model.device
+                getattr(getattr(self.model_backend, "model", None), "device", "cpu")
             )
-            # Fix: input_tokens[0] may be an int, so use len(input_tokens) for token count
+            # input_tokens is a tensor; use element count as a proxy for prompt length
+            prompt_len = int(input_tokens.numel()) if hasattr(input_tokens, "numel") else len(input_tokens)
             response = self._generate_with_processor(
                 prompt=prompt,
                 max_tokens=self.max_string_token_length,
                 stopping_criteria=[
                     StringStoppingCriteria(
-                        self.model_backend.tokenizer, len(input_tokens), maxLength
+                        self.model_backend.tokenizer, prompt_len, maxLength
                     )
                 ],
                 temperature=self.temperature,
@@ -360,7 +361,7 @@ class TypeGenerator:
         self.debug("[generate_string]", "|" + response + "|")
         return response
 
-    def generate_p_enum(self, prompt: str, values: list, round: int) -> str:
+    def generate_p_enum(self, prompt: str, values: list[str], round: int) -> list[dict[str, Any]]:
         """Generate a probabilistic enumeration from possible values.
 
         Args:
@@ -384,10 +385,14 @@ class TypeGenerator:
                 "1. A tokenizer property\n"
                 "2. Model access for logit processing"
             )
-        input_ids = self.model_backend.tokenizer.encode(prompt, return_tensors="pt").to(
-            self.model_backend.model.device
+        model_any: Any = getattr(self.model_backend, "model", None)
+        tokenizer_any: Any = getattr(self.model_backend, "tokenizer", None)
+        if model_any is None or tokenizer_any is None:
+            raise NotImplementedError("Backend must provide model and tokenizer for probabilistic enums.")
+        input_ids = tokenizer_any.encode(prompt, return_tensors="pt").to(
+            getattr(model_any, "device", "cpu")
         )[0]
-        values_tokens = self.model_backend.tokenizer(values).input_ids
+        values_tokens = tokenizer_any(values).input_ids
         values_tokens = [torch.tensor(c) for c in values_tokens]
         r = list(
             prob_choice_tree(

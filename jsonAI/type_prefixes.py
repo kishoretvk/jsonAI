@@ -10,7 +10,7 @@ class TypePrefixIdentifier:
 
     @staticmethod
     def is_number_prefix(s: str) -> bool:
-        return re.match(r"^[\-\d]+\.?[\d]*$", s)
+        return re.match(r"^[\-\d]+\.?[\d]*$", s) is not None
 
     @staticmethod
     def is_boolean_prefix(s: str) -> bool:
@@ -22,27 +22,27 @@ class TypePrefixIdentifier:
 
     @staticmethod
     def is_string_prefix(s: str) -> bool:
-        return re.match(r'^"[^"]*"?$', s)
+        return re.match(r'^"[^"]*"?$', s) is not None
 
     @staticmethod
     def is_array_prefix(s: str) -> bool:
-        return re.match(r'^\["\-\d\[{]*$', s)
+        return re.match(r'^\["\-\d\[{]*$', s) is not None
 
     @staticmethod
     def is_object_prefix(s: str) -> bool:
-        return re.match(r'^\{"?$', s)
+        return re.match(r'^\{"?$', s) is not None
 
     @staticmethod
     def is_datetime_prefix(s: str) -> bool:
-        return re.match(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}', s)
+        return re.match(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}', s) is not None
 
     @staticmethod
     def is_date_prefix(s: str) -> bool:
-        return re.match(r'^\d{4}-\d{2}-\d{2}$', s)
+        return re.match(r'^\d{4}-\d{2}-\d{2}$', s) is not None
 
     @staticmethod
     def is_time_prefix(s: str) -> bool:
-        return re.match(r'^\d{2}:\d{2}:\d{2}$', s)
+        return re.match(r'^\d{2}:\d{2}:\d{2}$', s) is not None
 
     @staticmethod
     def is_uuid_prefix(s: str) -> bool:
@@ -50,11 +50,11 @@ class TypePrefixIdentifier:
             r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-"
             r"[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
             s,
-        )
+        ) is not None
 
     @staticmethod
     def is_binary_prefix(s: str) -> bool:
-        return re.match(r'^[A-Za-z0-9+/]+={0,2}$', s)
+        return re.match(r'^[A-Za-z0-9+/]+={0,2}$', s) is not None
 
 
 class TypePrefixExtractor:

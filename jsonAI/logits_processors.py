@@ -1,4 +1,5 @@
 from transformers import PreTrainedTokenizer, StoppingCriteria, LogitsProcessor
+from typing import Optional
 import torch
 
 
@@ -7,7 +8,7 @@ class StringStoppingCriteria(StoppingCriteria):
         self,
         tokenizer: PreTrainedTokenizer,
         prompt_length: int,
-        max_length: int = None,
+        max_length: Optional[int] = None,
     ):
         self.tokenizer = tokenizer
         self.prompt_length = prompt_length
@@ -60,6 +61,7 @@ class NumberStoppingCriteria(StoppingCriteria):
         try:
             number = float(generated_text)
             rounded_number = round(number, self.precision)
+            # Stop once we exceed target precision length (heuristic)
             return len(str(rounded_number)) > self.precision
         except ValueError:
             return False
