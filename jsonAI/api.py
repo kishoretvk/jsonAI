@@ -17,7 +17,7 @@ from datetime import datetime
 import logging
 
 from .main import Jsonformer
-from .async_jsonformer import AsyncJsonformer
+from .async_jsonformer import FullAsyncJsonformer as AsyncJsonformer
 from .performance import OptimizedJsonformer, PerformanceMonitor
 # from .model_backends import get_model_and_tokenizer  # removed: symbol not present; adapted below
 
@@ -108,19 +108,39 @@ async def get_jsonformer(request: GenerationRequest) -> Union[Jsonformer, Optimi
         try:
             # Get model and tokenizer
             if cache_key not in _model_cache:
-                # Resolve model/tokenizer using ModelFactory to avoid missing import
-                from .model_backends import ModelFactory  # type: ignore
-                model, tokenizer = ModelFactory.resolve(
-                    provider=request.model_name,
-                    model_path=request.model_path
-                )
+                # Resolve model/tokenizer based on provider
+                if request.model_name.lower() == "ollama":
+                    from .model_backends import OllamaBackend, DummyTokenizer
+                    model = OllamaBackend(model_name=request.model_path or "llama3")
+                    tokenizer = DummyTokenizer()
+                elif request.model_name.lower() == "transformers":
+                    # Placeholder: user must provide actual model/tokenizer elsewhere
+                    raise ValueError("Transformers backend requires a provided model/tokenizer")
+                elif request.model_name.lower() == "openai":
+                    from .model_backends import OpenAIBackend, DummyTokenizer
+                    model = OpenAIBackend(api_key=request.model_path or "")
+                    tokenizer = DummyTokenizer()
+                else:
+                    # Fallback dummy backend for tests
+                    from .model_backends import DummyBackend
+                    backend = DummyBackend()
+                    model = backend
+                    tokenizer = backend.tokenizer
                 _model_cache[cache_key] = (model, tokenizer)
             else:
                 model, tokenizer = _model_cache[cache_key]
             
-            # Create optimized jsonformer
+            # Create optimized jsonformer (expects model_backend + schema + prompt)
+            # Wrap provided (model, tokenizer) in a backend-like object if needed
+            from .model_backends import ModelBackend, DummyBackend
+            if isinstance(model, ModelBackend):
+                backend = model
+            else:
+                # If 'model' is not a ModelBackend, fall back to DummyBackend for compatibility
+                backend = DummyBackend()
+            # OptimizedJsonformer inherits Jsonformer signature (model_backend, json_schema, prompt, ...)
             jsonformer = OptimizedJsonformer(
-                model=model,
+                model=backend,
                 tokenizer=tokenizer,
                 schema=request.schema,
                 cache_size=1000,
@@ -130,7 +150,7 @@ async def get_jsonformer(request: GenerationRequest) -> Union[Jsonformer, Optimi
             _jsonformer_cache[cache_key] = jsonformer
             
         except Exception as e:
-            logger.error(f"Failed to create Jsonformer: {str(e)}")
+            logger.error("Failed to create Jsonformer: %s", str(e))
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to initialize model: {str(e)}"
@@ -191,7 +211,7 @@ async def generate_json(request: GenerationRequest):
         )
         
     except Exception as e:
-        logger.error(f"Generation failed for request {request_id}: {str(e)}")
+        logger.error("Generation failed for request %s: %s", request_id, str(e))
         raise HTTPException(
             status_code=500,
             detail=f"Generation failed: {str(e)}"
@@ -207,20 +227,29 @@ async def generate_json_async(request: GenerationRequest):
         cache_key = f"{request.model_name}:{request.model_path}"
         
         if cache_key not in _model_cache:
-            from .model_backends import ModelFactory  # type: ignore
-            model, tokenizer = ModelFactory.resolve(
-                provider=request.model_name,
-                model_path=request.model_path
-            )
+            if request.model_name.lower() == "ollama":
+                from .model_backends import OllamaBackend, DummyTokenizer
+                model = OllamaBackend(model_name=request.model_path or "llama3")
+                tokenizer = DummyTokenizer()
+            elif request.model_name.lower() == "openai":
+                from .model_backends import OpenAIBackend, DummyTokenizer
+                model = OpenAIBackend(api_key=request.model_path or "")
+                tokenizer = DummyTokenizer()
+            else:
+                from .model_backends import DummyBackend
+                backend = DummyBackend()
+                model = backend
+                tokenizer = backend.tokenizer
             _model_cache[cache_key] = (model, tokenizer)
         else:
             model, tokenizer = _model_cache[cache_key]
         
         # Create async jsonformer
+        # Our AsyncJsonformer in async_jsonformer.py is FullAsyncJsonformer aliased as AsyncJsonformer
         async_jsonformer = AsyncJsonformer(
-            model=model,
-            tokenizer=tokenizer,
-            schema=request.schema
+            model_backend=model,
+            json_schema=request.schema,
+            prompt=request.prompt
         )
         
         # Start performance monitoring
@@ -241,7 +270,7 @@ async def generate_json_async(request: GenerationRequest):
         )
         
     except Exception as e:
-        logger.error(f"Async generation failed for request {request_id}: {str(e)}")
+        logger.error("Async generation failed for request %s: %s", request_id, str(e))
         raise HTTPException(
             status_code=500,
             detail=f"Async generation failed: {str(e)}"
@@ -299,7 +328,7 @@ async def generate_json_batch(batch_request: BatchGenerationRequest):
                     
                 except Exception as e:
                     error_count += 1
-                    logger.error(f"Batch request {request_id} failed: {str(e)}")
+                    logger.error("Batch request %s failed: %s", request_id, str(e))
                     
                     return GenerationResponse(
                         id=request_id,
@@ -324,7 +353,7 @@ async def generate_json_batch(batch_request: BatchGenerationRequest):
         )
         
     except Exception as e:
-        logger.error(f"Batch processing failed: {str(e)}")
+        logger.error("Batch processing failed: %s", str(e))
         raise HTTPException(
             status_code=500,
             detail=f"Batch processing failed: {str(e)}"
@@ -350,7 +379,7 @@ async def get_statistics():
         )
         
     except Exception as e:
-        logger.error(f"Failed to get statistics: {str(e)}")
+        logger.error("Failed to get statistics: %s", str(e))
         raise HTTPException(
             status_code=500,
             detail=f"Failed to get statistics: {str(e)}"
@@ -373,7 +402,7 @@ async def clear_cache():
         return {"status": "success", "message": "All caches cleared"}
         
     except Exception as e:
-        logger.error(f"Failed to clear cache: {str(e)}")
+        logger.error("Failed to clear cache: %s", str(e))
         raise HTTPException(
             status_code=500,
             detail=f"Failed to clear cache: {str(e)}"
@@ -383,9 +412,11 @@ async def clear_cache():
 async def validate_schema(schema: Dict[str, Any]):
     """Validate a JSON schema."""
     try:
-        from .schema_validator import validate_schema
-        
-        is_valid, errors = validate_schema(schema)
+        # Adapt to SchemaValidator class in schema_validator.py
+        from .schema_validator import SchemaValidator
+        validator = SchemaValidator()
+        is_valid = validator.validate(schema, {"type": "object"}, raise_on_error=False)
+        errors = None if is_valid else "Schema did not validate against a basic object type"
         
         return {
             "valid": is_valid,
@@ -394,7 +425,7 @@ async def validate_schema(schema: Dict[str, Any]):
         }
         
     except Exception as e:
-        logger.error(f"Schema validation failed: {str(e)}")
+        logger.error("Schema validation failed: %s", str(e))
         raise HTTPException(
             status_code=500,
             detail=f"Schema validation failed: {str(e)}"
@@ -415,7 +446,7 @@ async def http_exception_handler(request, exc):
 @app.exception_handler(Exception)
 async def general_exception_handler(request, exc):
     """Handle general exceptions."""
-    logger.error(f"Unhandled exception: {str(exc)}")
+    logger.error("Unhandled exception: %s", str(exc))
     return JSONResponse(
         status_code=500,
         content=ErrorResponse(

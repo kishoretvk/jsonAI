@@ -16,6 +16,8 @@ from .output_formatter import OutputFormatter
 from .schema_validator import SchemaValidator
 from .tool_registry import ToolRegistry
 from .schema_generator import SchemaGenerator
+from .async_jsonformer import FullAsyncJsonformer
+from .model_backends import ModelBackend, TransformersBackend, OllamaBackend, OpenAIBackend, DummyBackend
 
 __all__ = [
     "Jsonformer",
@@ -24,4 +26,10 @@ __all__ = [
     "SchemaValidator",
     "ToolRegistry",
     "SchemaGenerator",
+    "FullAsyncJsonformer",
+    "ModelBackend",
+    "TransformersBackend",
+    "OllamaBackend",
+    "OpenAIBackend",
+    "DummyBackend",
 ]

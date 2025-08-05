@@ -15,7 +15,8 @@ import hashlib
 from contextlib import asynccontextmanager
 
 from .main import Jsonformer
-from .async_jsonformer import AsyncJsonformer
+# Use the async wrapper defined in main.py to detect async capability
+from .main import AsyncJsonformer
 
 
 class PerformanceMonitor:
@@ -125,8 +126,12 @@ class CachedJsonformer(Jsonformer):
             return self.schema_cache[cache_key]
             
         # Generate and cache result
-        with self.monitor.async_timer('generation'):
+        # Use synchronous timing instead of async context manager inside sync method
+        self.monitor.start_operation('generation')
+        try:
             result = super().generate(prompt, **kwargs)
+        finally:
+            self.monitor.end_operation('generation')
             
         # Store in appropriate cache based on complexity
         schema_complexity = self._calculate_schema_complexity()
@@ -234,7 +239,8 @@ class BatchProcessor:
                     'status': 'error'
                 }
                 
-        with self.monitor.async_timer('batch_total'):
+        # Use async context manager correctly with 'async with'
+        async with self.monitor.async_timer('batch_total'):
             tasks = [safe_process(req) for req in requests]
             results = await asyncio.gather(*tasks)
             
