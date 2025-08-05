@@ -8,6 +8,10 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+  security-events: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -43,6 +47,12 @@ jobs:
 
     - name: Run Integration Tests
       run: poetry run pytest examples --cov=jsonAI --cov-report=xml -v
+
+    - name: Upload Trivy SARIF (skip on forked PRs)
+      if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: trivy-results.sarif
 
     - name: Generate Local Coverage Report
       run: poetry run coverage report
