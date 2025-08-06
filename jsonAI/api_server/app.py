@@ -9,6 +9,21 @@ from fastapi import FastAPI, Depends, Request, Response, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
+# Observability: Prometheus metrics and OpenTelemetry tracing
+import time
+import socket
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from starlette.responses import Response as StarletteResponse
+
+# OpenTelemetry setup (env-driven)
+from opentelemetry import trace
+from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter as OTLPHTTPSpanExporter
+from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
 from jsonAI.api_server.security import OIDCConfig, OIDCValidator
 from jsonAI.api_server.schemas import CsvSchema, XmlSchema
 from jsonAI.type_generator import TypeGenerator
@@ -19,6 +34,56 @@ from jsonAI.schema_validator import SchemaValidator
 # --------- App init & security ---------
 
 app = FastAPI(title="GenerativeJson Test Data Service", version="0.1.0")
+
+# ----- Observability configuration (env-driven) -----
+OBS_ENABLE_METRICS = os.getenv("OBS_ENABLE_METRICS", "true").lower() == "true"
+OBS_ENABLE_TRACING = os.getenv("OBS_ENABLE_TRACING", "true").lower() == "true"
+
+# Prometheus metrics
+REQUEST_COUNT = Counter(
+    "http_requests_total",
+    "Total HTTP requests",
+    ["method", "path", "status"],
+)
+REQUEST_LATENCY = Histogram(
+    "http_request_duration_seconds",
+    "HTTP request latency in seconds",
+    ["method", "path"],
+    buckets=(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10),
+)
+
+if OBS_ENABLE_TRACING:
+    # OTEL environment variables expected:
+    # OTEL_EXPORTER_OTLP_ENDPOINT (e.g., http://otel-collector:4318)
+    # OTEL_SERVICE_NAME (default: generativejson-api)
+    # Optional: OTEL_EXPORTER_OTLP_HEADERS (key1=val1,key2=val2)
+    otlp_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "").strip()
+    service_name = os.getenv("OTEL_SERVICE_NAME", "generativejson-api")
+    headers_str = os.getenv("OTEL_EXPORTER_OTLP_HEADERS", "")
+    otlp_headers = None
+    if headers_str:
+        # Convert "k=v,k2=v2" -> dict
+        parts = [p for p in headers_str.split(",") if p]
+        otlp_headers = {}
+        for p in parts:
+            if "=" in p:
+                k, v = p.split("=", 1)
+                otlp_headers[k.strip()] = v.strip()
+
+    resource = Resource.create({
+        SERVICE_NAME: service_name,
+        "host.name": socket.gethostname(),
+        "service.version": "0.1.0",
+    })
+    tracer_provider = TracerProvider(resource=resource)
+    if otlp_endpoint:
+        span_exporter = OTLPHTTPSpanExporter(endpoint=f"{otlp_endpoint}/v1/traces", headers=otlp_headers)
+        tracer_provider.add_span_processor(BatchSpanProcessor(span_exporter))
+    trace.set_tracer_provider(tracer_provider)
+
+    # Instrument FastAPI/ASGI
+    app.add_middleware(OpenTelemetryMiddleware)
+    FastAPIInstrumentor.instrument_app(app)
 
 _oidc_config: OIDCConfig | None = None
 _oidc_validator: OIDCValidator | None = None
@@ -88,8 +153,22 @@ def _get_backend() -> ModelBackend:
 async def health() -> Dict[str, str]:
     return {"status": "ok"}
 
+if OBS_ENABLE_METRICS:
+    @app.get("/metrics")
+    async def metrics() -> StarletteResponse:
+        # Expose Prometheus metrics text format
+        return StarletteResponse(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
 @app.post("/generate/json")
 async def generate_json(req: JsonGenerateRequest, _: Dict[str, Any] = Depends(require_auth)) -> JSONResponse:
+    start = time.perf_counter()
+    try:
+        # business logic below
+        pass
+    finally:
+        duration = time.perf_counter() - start
+        if OBS_ENABLE_METRICS:
+            REQUEST_LATENCY.labels(method="POST", path="/generate/json").observe(duration)
     schema = req.schema
     options = req.options or {}
     seed = int(options.get("seed", 42))
@@ -107,12 +186,24 @@ async def generate_json(req: JsonGenerateRequest, _: Dict[str, Any] = Depends(re
         data = jf.generate_data()
         results.append(data)
 
+    if OBS_ENABLE_METRICS:
+        # record status after work completes
+        REQUEST_COUNT.labels(method="POST", path="/generate/json", status="200").inc()
+
     if count == 1:
         return JSONResponse(content={"data": results[0]})
     return JSONResponse(content={"data": results})
 
 @app.post("/generate/csv")
 async def generate_csv(req: CsvGenerateRequest, request: Request, _: Dict[str, Any] = Depends(require_auth)) -> Response:
+    start = time.perf_counter()
+    try:
+        # business logic below
+        pass
+    finally:
+        duration = time.perf_counter() - start
+        if OBS_ENABLE_METRICS:
+            REQUEST_LATENCY.labels(method="POST", path="/generate/csv").observe(duration)
     schema = req.csvSchema
     options = req.options or {}
     rows = int(options.get("rows", schema.rows))
@@ -157,10 +248,20 @@ async def generate_csv(req: CsvGenerateRequest, request: Request, _: Dict[str, A
                 yield (delimiter.join(values) + "\n").encode("utf-8")
         return _aiter()
 
+    if OBS_ENABLE_METRICS:
+        REQUEST_COUNT.labels(method="POST", path="/generate/csv", status="200").inc()
     return StreamingResponse(row_iter(), media_type="text/csv")
 
 @app.post("/generate/xml")
 async def generate_xml(req: XmlGenerateRequest, _: Dict[str, Any] = Depends(require_auth)) -> PlainTextResponse:
+    start = time.perf_counter()
+    try:
+        # business logic below
+        pass
+    finally:
+        duration = time.perf_counter() - start
+        if OBS_ENABLE_METRICS:
+            REQUEST_LATENCY.labels(method="POST", path="/generate/xml").observe(duration)
     schema = req.xmlSchema
     options = req.options or {}
     seed = int(options.get("seed", 42))
@@ -192,19 +293,41 @@ async def generate_xml(req: XmlGenerateRequest, _: Dict[str, Any] = Depends(requ
             buf.write("example")
         buf.write(f"</{el.name}>")
     buf.write(f"</{schema.root}>")
+    if OBS_ENABLE_METRICS:
+        REQUEST_COUNT.labels(method="POST", path="/generate/xml", status="200").inc()
     return PlainTextResponse(content=buf.getvalue(), media_type="application/xml")
 
 @app.post("/validate/json")
 async def validate_json(req: ValidateJsonRequest, _: Dict[str, Any] = Depends(require_auth)) -> JSONResponse:
+    start = time.perf_counter()
+    try:
+        # business logic below
+        pass
+    finally:
+        duration = time.perf_counter() - start
+        if OBS_ENABLE_METRICS:
+            REQUEST_LATENCY.labels(method="POST", path="/validate/json").observe(duration)
     validator = SchemaValidator()
     try:
         validator.validate(req.data, req.schema)
+        if OBS_ENABLE_METRICS:
+            REQUEST_COUNT.labels(method="POST", path="/validate/json", status="200").inc()
         return JSONResponse(content={"valid": True})
     except Exception as e:
+        if OBS_ENABLE_METRICS:
+            REQUEST_COUNT.labels(method="POST", path="/validate/json", status="400").inc()
         return JSONResponse(content={"valid": False, "errors": [str(e)]}, status_code=400)
 
 @app.post("/validate/csv")
 async def validate_csv(req: ValidateCsvRequest, _: Dict[str, Any] = Depends(require_auth)) -> JSONResponse:
+    start = time.perf_counter()
+    try:
+        # business logic below
+        pass
+    finally:
+        duration = time.perf_counter() - start
+        if OBS_ENABLE_METRICS:
+            REQUEST_LATENCY.labels(method="POST", path="/validate/csv").observe(duration)
     # Minimal CSV validation: header match and column count per row
     if req.sample is None:
         raise HTTPException(status_code=400, detail="sample is required for CSV validation in v1")
@@ -229,14 +352,32 @@ async def validate_csv(req: ValidateCsvRequest, _: Dict[str, Any] = Depends(requ
             errors.append(f"row {i} column count mismatch: expected {len(expected_cols)}, got {len(parts)}")
 
     if errors:
+        if OBS_ENABLE_METRICS:
+            REQUEST_COUNT.labels(method="POST", path="/validate/csv", status="400").inc()
         return JSONResponse(content={"valid": False, "errors": errors}, status_code=400)
+    if OBS_ENABLE_METRICS:
+        REQUEST_COUNT.labels(method="POST", path="/validate/csv", status="200").inc()
     return JSONResponse(content={"valid": True})
 
 @app.post("/validate/xml")
 async def validate_xml(req: ValidateXmlRequest, _: Dict[str, Any] = Depends(require_auth)) -> JSONResponse:
+    start = time.perf_counter()
+    try:
+        # business logic below
+        pass
+    finally:
+        duration = time.perf_counter() - start
+        if OBS_ENABLE_METRICS:
+            REQUEST_LATENCY.labels(method="POST", path="/validate/xml").observe(duration)
     # Minimal XML validation placeholder (v1). Proper XSD validation arrives in v2.
     if not req.sample:
+        if OBS_ENABLE_METRICS:
+            REQUEST_COUNT.labels(method="POST", path="/validate/xml", status="400").inc()
         return JSONResponse(content={"valid": False, "errors": ["missing sample"]}, status_code=400)
     if f"</{req.xmlSchema.root}>" not in req.sample:
+        if OBS_ENABLE_METRICS:
+            REQUEST_COUNT.labels(method="POST", path="/validate/xml", status="400").inc()
         return JSONResponse(content={"valid": False, "errors": ["root element mismatch"]}, status_code=400)
+    if OBS_ENABLE_METRICS:
+        REQUEST_COUNT.labels(method="POST", path="/validate/xml", status="200").inc()
     return JSONResponse(content={"valid": True})
