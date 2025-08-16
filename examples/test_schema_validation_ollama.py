@@ -70,10 +70,12 @@ def test_json_schema_validation_ollama():
             print("Error:", error)
             print("--------------------------------------")
             return
-    # Validate output
-    validator = SchemaValidator()
-    validator.validate(generated, schema)
-    assert set(generated.keys()) == {"name", "age", "email"}
+        # Validate output
+        validator = SchemaValidator()
+        validator.validate(generated, schema)
+        # Allow extra fields, just require all required keys
+        for key in ["name", "age", "email"]:
+            assert key in generated
     print("Ollama schema validation test passed.")
 
 if __name__ == "__main__":

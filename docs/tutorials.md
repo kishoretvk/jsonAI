@@ -691,6 +691,27 @@ curl -X POST http://localhost/generate \
 
 ---
 
+## Environment Configuration Example
+
+You can verify which environment is active and which variables are loaded using the provided example:
+
+```bash
+# Set environment variables or use a .env file, then run:
+python examples/env_example.py
+```
+
+This will print the current environment and key configuration variables.
+
+To test all environments programmatically, run:
+
+```bash
+pytest tests/test_env_config.py
+```
+
+This test checks that the correct environment variables are loaded for dev, qa, perf, cte, and prod.
+
+---
+
 ## Real-World Examples
 
 ### Tutorial 10: E-commerce Application

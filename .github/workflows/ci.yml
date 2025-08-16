@@ -18,9 +18,13 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.11", "3.12"]
+        app-env: [dev, qa, perf, cte, prod]
 
     steps:
     - uses: actions/checkout@v4
+
+    - name: Set environment file for ${{ matrix.app-env }}
+      run: cp .env.${{ matrix.app-env }} .env
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
@@ -48,11 +52,26 @@ jobs:
     - name: Run Integration Tests
       run: poetry run pytest examples --cov=jsonAI --cov-report=xml -v
 
-    - name: Upload Trivy SARIF (skip on forked PRs)
+    - name: Run Trivy vulnerability scan (SARIF output)
+      run: |
+        pip install trivy
+        trivy fs --format sarif --output trivy-results.sarif .
+
+    - name: Upload Trivy SARIF (skip on forked PRs, only if SARIF exists)
       if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-      uses: github/codeql-action/upload-sarif@v3
-      with:
-        sarif_file: trivy-results.sarif
+      run: |
+        if [ -f trivy-results.sarif ]; then
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            /repos/${{ github.repository }}/code-scanning/sarifs \
+            -F commit_sha="${{ github.sha }}" \
+            -F ref="${{ github.ref }}" \
+            -F sarif=@trivy-results.sarif
+        else
+          echo "No SARIF file to upload."
+        fi
 
     - name: Generate Local Coverage Report
       run: poetry run coverage report

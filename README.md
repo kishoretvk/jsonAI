@@ -501,6 +501,38 @@ JsonAI leverages high-performance native libraries for data processing and exten
 
 For any tabular or batch data processing, it is recommended to use **pandas** for reliability and performance. If you extend JsonAI or build custom output logic, prefer native libraries like pandas, numpy, or others for best results.
 
+## Multi-Environment Support
+
+JsonAI supports multiple environments: dev, qa, perf, cte, and prod. Each environment has its own `.env` file at the project root.
+
+- **Local Development:**  
+  Copy or rename the desired `.env.*` file to `.env` before running locally.
+  ```bash
+  cp .env.dev .env
+  uvicorn jsonAI.api:app --host 0.0.0.0 --port 8000
+  ```
+
+- **Docker Compose:**  
+  Edit `docker-compose.yml` to set the `env_file` for the desired environment (e.g., `.env.prod`).  
+  Or override at runtime:
+  ```bash
+  docker-compose --env-file .env.qa up -d
+  ```
+
+- **Docker:**  
+  Pass the environment file at runtime:
+  ```bash
+  docker run --env-file .env.prod -p 8000:8000 jsonai:latest
+  ```
+
+- **CI/CD:**  
+  The GitHub Actions workflow tests all environments by copying the correct `.env.*` file to `.env` for each matrix job.
+
+- **APP_ENV Variable:**  
+  The Dockerfile sets `APP_ENV` (default: dev) for extensibility. You can override this at runtime.
+
+See `docs/deployment.md` for more details.
+
 ## Deployment
 
 - API:
