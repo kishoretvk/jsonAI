@@ -489,6 +489,18 @@ See the [examples/](examples/) directory for more advanced usage and integration
 
 This project is licensed under the MIT License.
 
+## Native Library Usage
+
+JsonAI leverages high-performance native libraries for data processing and extensibility:
+
+- **PyYAML** for YAML serialization
+- **lxml** for XML output
+- **cachetools** for caching
+- **requests** and **aiohttp** for HTTP
+- **jsonschema** for validation
+
+For any tabular or batch data processing, it is recommended to use **pandas** for reliability and performance. If you extend JsonAI or build custom output logic, prefer native libraries like pandas, numpy, or others for best results.
+
 ## Deployment
 
 - API:

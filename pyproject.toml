@@ -3,7 +3,24 @@ name = "jsonAI"
 version = "0.15.2.1"  # Patch bump for PyPI republish; previous versions exist on PyPI
 description = "A Python library for dynamic JSON generation based on schemas using language models."
 authors = ["1rgs <kishoretvk9@gmail.com>"]
+license = "MIT"
 readme = "README.md"
+homepage = "https://github.com/kishoretvk/GenerativeJson"
+repository = "https://github.com/kishoretvk/GenerativeJson"
+documentation = "https://github.com/kishoretvk/GenerativeJson#readme"
+keywords = ["json", "llm", "schema", "generation", "fastapi", "openai", "ollama", "transformers"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Libraries :: Application Frameworks"
+]
 
 [[tool.poetry.packages]]
 from = "."

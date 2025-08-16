@@ -320,6 +320,8 @@ async def validate_json(req: ValidateJsonRequest, _: Dict[str, Any] = Depends(re
 
 @app.post("/validate/csv")
 async def validate_csv(req: ValidateCsvRequest, _: Dict[str, Any] = Depends(require_auth)) -> JSONResponse:
+    import csv
+    import io
     start = time.perf_counter()
     try:
         # business logic below
@@ -328,29 +330,28 @@ async def validate_csv(req: ValidateCsvRequest, _: Dict[str, Any] = Depends(requ
         duration = time.perf_counter() - start
         if OBS_ENABLE_METRICS:
             REQUEST_LATENCY.labels(method="POST", path="/validate/csv").observe(duration)
-    # Minimal CSV validation: header match and column count per row
+    # Improved CSV validation using Python's csv module
     if req.sample is None:
-        raise HTTPException(status_code=400, detail="sample is required for CSV validation in v1")
-    lines = [ln for ln in req.sample.splitlines() if ln.strip() != ""]
-    if not lines:
-        return JSONResponse(content={"valid": False, "errors": ["empty sample"]}, status_code=400)
-
+        raise HTTPException(status_code=400, detail="sample is required for CSV validation")
+    errors: list[str] = []
     delimiter = req.csvSchema.delimiter
     expected_cols = [c.name for c in req.csvSchema.columns]
-    errors: list[str] = []
-
-    start_idx = 0
-    if req.csvSchema.header:
-        header = lines[0].split(delimiter)
-        if header != expected_cols:
-            errors.append(f"header mismatch: expected {expected_cols}, got {header}")
-        start_idx = 1
-
-    for i in range(start_idx, len(lines)):
-        parts = lines[i].split(delimiter)
-        if len(parts) != len(expected_cols):
-            errors.append(f"row {i} column count mismatch: expected {len(expected_cols)}, got {len(parts)}")
-
+    try:
+        reader = csv.reader(io.StringIO(req.sample), delimiter=delimiter)
+        rows = list(reader)
+        if not rows:
+            return JSONResponse(content={"valid": False, "errors": ["empty sample"]}, status_code=400)
+        start_idx = 0
+        if req.csvSchema.header:
+            header = rows[0]
+            if header != expected_cols:
+                errors.append(f"header mismatch: expected {expected_cols}, got {header}")
+            start_idx = 1
+        for i, row in enumerate(rows[start_idx:], start=start_idx):
+            if len(row) != len(expected_cols):
+                errors.append(f"row {i} column count mismatch: expected {len(expected_cols)}, got {len(row)}")
+    except Exception as e:
+        errors.append(f"CSV parsing error: {e}")
     if errors:
         if OBS_ENABLE_METRICS:
             REQUEST_COUNT.labels(method="POST", path="/validate/csv", status="400").inc()
@@ -361,6 +362,7 @@ async def validate_csv(req: ValidateCsvRequest, _: Dict[str, Any] = Depends(requ
 
 @app.post("/validate/xml")
 async def validate_xml(req: ValidateXmlRequest, _: Dict[str, Any] = Depends(require_auth)) -> JSONResponse:
+    import xml.etree.ElementTree as ET
     start = time.perf_counter()
     try:
         # business logic below
@@ -369,15 +371,22 @@ async def validate_xml(req: ValidateXmlRequest, _: Dict[str, Any] = Depends(requ
         duration = time.perf_counter() - start
         if OBS_ENABLE_METRICS:
             REQUEST_LATENCY.labels(method="POST", path="/validate/xml").observe(duration)
-    # Minimal XML validation placeholder (v1). Proper XSD validation arrives in v2.
+    # XML validation using xml.etree.ElementTree
     if not req.sample:
         if OBS_ENABLE_METRICS:
             REQUEST_COUNT.labels(method="POST", path="/validate/xml", status="400").inc()
         return JSONResponse(content={"valid": False, "errors": ["missing sample"]}, status_code=400)
-    if f"</{req.xmlSchema.root}>" not in req.sample:
+    errors = []
+    try:
+        root = ET.fromstring(req.sample)
+        if root.tag != req.xmlSchema.root:
+            errors.append(f"root element mismatch: expected '{req.xmlSchema.root}', got '{root.tag}'")
+    except ET.ParseError as e:
+        errors.append(f"XML parsing error: {e}")
+    if errors:
         if OBS_ENABLE_METRICS:
             REQUEST_COUNT.labels(method="POST", path="/validate/xml", status="400").inc()
-        return JSONResponse(content={"valid": False, "errors": ["root element mismatch"]}, status_code=400)
+        return JSONResponse(content={"valid": False, "errors": errors}, status_code=400)
     if OBS_ENABLE_METRICS:
         REQUEST_COUNT.labels(method="POST", path="/validate/xml", status="200").inc()
     return JSONResponse(content={"valid": True})

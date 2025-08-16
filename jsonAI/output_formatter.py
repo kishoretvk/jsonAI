@@ -4,6 +4,12 @@ import yaml
 import csv
 from collections import OrderedDict
 
+try:
+    import pandas as pd
+    _HAS_PANDAS = True
+except ImportError:
+    _HAS_PANDAS = False
+
 
 class OutputFormatter:
     """
@@ -90,20 +96,32 @@ class OutputFormatter:
 
     def _dict_to_csv(self, data):
         """
-        Convert a dictionary to a CSV string.
+        Convert a dictionary or list of dicts to a CSV string.
+        Uses pandas if available for tabular data.
 
         Args:
-            data (dict): The data to convert.
+            data (dict or list): The data to convert.
 
         Returns:
             str: The CSV string.
         """
-        if not isinstance(data, dict):
-            raise TypeError("CSV output requires a dictionary.")
-
-        # Create headers and values rows
-        headers = ",".join(data.keys())
-        values = ",".join(map(str, data.values()))
-
-        # Ensure no trailing newline
-        return f"{headers}\n{values}"
+        # Use pandas for tabular data if available
+        if _HAS_PANDAS:
+            if isinstance(data, list):
+                if all(isinstance(row, dict) for row in data):
+                    df = pd.DataFrame(data)
+                    return df.to_csv(index=False)
+            elif isinstance(data, dict):
+                # If dict of lists, treat as columns
+                if all(isinstance(v, list) for v in data.values()):
+                    df = pd.DataFrame(data)
+                    return df.to_csv(index=False)
+                # Otherwise, treat as single row
+                df = pd.DataFrame([data])
+                return df.to_csv(index=False)
+        # Fallback: original logic for flat dicts
+        if isinstance(data, dict):
+            headers = ",".join(data.keys())
+            values = ",".join(map(str, data.values()))
+            return f"{headers}\n{values}"
+        raise TypeError("CSV output requires a dictionary or list of dictionaries.")
