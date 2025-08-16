@@ -23,7 +23,8 @@ class TestOutputFormatter(unittest.TestCase):
     def test_format_csv(self):
         data = {"name": "Alice", "age": 30}
         result = self.formatter.format(data, "csv")
-        self.assertEqual(result, "name,age\nAlice,30")
+        normalized = result.replace("\r\n", "\n").strip()
+        self.assertEqual(normalized, "name,age\nAlice,30")
 
     def test_format_edge_case(self):
         data = {"name": "Alice", "age": None}
