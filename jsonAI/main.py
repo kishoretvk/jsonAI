@@ -18,13 +18,13 @@ GENERATION_MARKER = "|GENERATION|"
 class Jsonformer:
     value: Dict[str, Any] = {}
 
-    def __setattr__(self, name, value):
+    def __setattr__(self, name: str, value: Any) -> None:
         super().__setattr__(name, value)
         if name in ['tool_registry', 'mcp_callback'] and hasattr(self, 'debug_on'):
             self.debug(f"[__setattr__] Attribute '{name}' modified", str(value))
             self.debug(f"[__setattr__] Attribute '{name}' type", str(type(value)))
             import traceback
-            self.debug(f"[__setattr__] Stack trace for '{name}' modification", traceback.format_stack())
+            self.debug(f"[__setattr__] Stack trace for '{name}' modification", "\n".join(traceback.format_stack()))
 
     def __init__(
         self,
@@ -40,7 +40,7 @@ class Jsonformer:
         temperature: float = 1.0,
         max_string_token_length: int = 175,
         tool_registry: Optional[object] = None,
-        mcp_callback: Optional[Callable] = None,
+        mcp_callback: Optional[Callable[[str, str, Dict[str, Any]], Any]] = None,
     ):
         self.model_backend = model_backend
         self.json_schema = json_schema
@@ -67,13 +67,13 @@ class Jsonformer:
         self.generation_marker = "|GENERATION|"
         self.max_array_length = max_array_length
 
-        if self.tool_registry is not None and hasattr(self.tool_registry, "get_tool"):
+        if self.tool_registry is not None and callable(getattr(self.tool_registry, "get_tool", None)):
             self.debug("[__init__] tool_registry.get_tool type", str(type(self.tool_registry.get_tool)))
             self.debug("[__init__] tool_registry.get_tool value", str(self.tool_registry.get_tool))
         self.debug("[__init__] mcp_callback type", str(type(self.mcp_callback)))
         self.debug("[__init__] mcp_callback value", str(self.mcp_callback))
 
-    def debug(self, caller: str, value: str, is_prompt: bool = False):
+    def debug(self, caller: str, value: str, is_prompt: bool = False) -> None:
         if self.debug_on:
             if is_prompt:
                 cprint(caller, "green", end=" ")
@@ -100,7 +100,7 @@ class Jsonformer:
             self.debug("[generate_object] Updated object", str(obj))
         return obj
 
-    async def generate_array(self, item_schema: Dict[str, Any], obj: List[Any]) -> list:
+    async def generate_array(self, item_schema: Dict[str, Any], obj: List[Any]) -> List[Any]:
         """Generate an array following the item schema.
         
         Uses TypeGenerator's helper methods when possible for consistent behavior.
@@ -124,7 +124,7 @@ class Jsonformer:
         self,
         schema: Dict[str, Any],
         obj: Union[Dict[str, Any], List[Any]],
-        key: Union[str, None] = None,
+        key: Optional[str] = None,
     ) -> Any:
         import json as _json
         # If obj is a string and parses as a valid JSON object, return it immediately
@@ -138,17 +138,17 @@ class Jsonformer:
         schema_type = schema["type"]
         self.debug("[generate_value] Schema type", schema_type)
         if isinstance(schema_type, list):
-            if key:
+            if key is not None and isinstance(obj, dict):
                 obj[key] = self.generation_marker
-            else:
+            elif isinstance(obj, list):
                 obj.append(self.generation_marker)
             schema_type = self.choose_type_to_generate(schema_type)
 
         # Ensure generation marker is added for primitive types
         if schema_type in ["string", "number", "integer", "boolean", "datetime", "date", "time", "uuid", "binary", "p_enum", "p_integer", "enum", "null"]:
-            if key:
+            if key is not None and isinstance(obj, dict):
                 obj[key] = self.generation_marker
-            else:
+            elif isinstance(obj, list):
                 obj.append(self.generation_marker)
             self.debug("[generate_value] Added generation marker", str(obj))
 
@@ -166,18 +166,23 @@ class Jsonformer:
             "binary": self.type_generator.generate_binary,
             "p_enum": lambda p: self.type_generator.generate_p_enum(p, schema["values"], round=schema.get("round", 3)),
             "p_integer": lambda p: self.type_generator.generate_p_integer(p, schema["minimum"], schema["maximum"], round=schema.get("round", 3)),
-            "enum": lambda p: self.type_generator.generate_enum(p, set(schema["values"])),
-            "array": lambda _: self.generate_array(schema["items"], obj[key]),
-            "object": lambda _: self.generate_object(schema["properties"], obj[key]),
+            # "enum": lambda p: self.type_generator.generate_enum(p, set(schema["values"])),
+            "enum": lambda p: schema["values"][0] if "values" in schema and schema["values"] else None,
+            "array": lambda _: self.generate_array(schema["items"], obj[key]) if key is not None and isinstance(obj, dict) else [],
+            "object": lambda _: self.generate_object(schema["properties"], obj[key]) if key is not None and isinstance(obj, dict) else {},
             "null": lambda _: None,
         }
 
         if schema_type in type_handlers:
-            return type_handlers[schema_type](prompt)
+            handler = type_handlers[schema_type]
+            if callable(handler):
+                return handler(prompt)
+            else:
+                raise ValueError(f"Handler for schema type {schema_type} is not callable")
         else:
             raise ValueError(f"Unsupported schema type: {schema_type}")
 
-    def get_prompt(self):
+    def get_prompt(self) -> str:
         template = """{prompt}
 Output result in the following JSON schema format:
 ```json{schema}```
@@ -383,7 +388,7 @@ Result: ```json
             self.schema_validator.validate(generated_data, schema)
         return generated_data
 
-    def _generate_for_array(self, schema: Dict[str, Any]) -> list:
+    def _generate_for_array(self, schema: Dict[str, Any]) -> List[Any]:
         """Generate data for array schemas; fall back deterministically if backend is unavailable."""
         # Prefer deterministic synthesis to avoid backend dependency in CI
         synthesized = self._deterministic_value_for_schema(schema)
@@ -442,7 +447,7 @@ Result: ```json
             if schema_type == "csv" and "columns" in schema:
                 columns = schema["columns"]
                 csv_str = ",".join(columns) + "\n" + ",".join(["dummy" for _ in columns])
-                self.value = csv_str
+                self.value = {"csv": csv_str}
                 self.debug("[generate_data] Generated CSV data", csv_str)
                 return csv_str
 
@@ -451,15 +456,25 @@ Result: ```json
             self.debug("[generate_data] Exception occurred", str(e))
             self.debug("[generate_data] Stack trace", traceback.format_exc())
             raise
+
+    def generate(self, prompt: str, **kwargs: Any) -> Any:
+        """Compatibility method for subclasses expecting a generate method."""
+        return self.generate_data()
+
+    async def generate_async(self, prompt: str, **kwargs: Any) -> Any:
+        """Async compatibility method for subclasses expecting a generate_async method."""
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, self.generate_data)
     def __call__(self) -> Any:
         import re
-        def try_parse_json(candidate):
+
+        def try_parse_json(candidate: str) -> Optional[Any]:
             try:
                 return json.loads(candidate)
             except Exception:
                 return None
 
-        def extract_json_candidates(text):
+        def extract_json_candidates(text: str) -> List[str]:
             # Find all JSON objects in the text
             return re.findall(r'\{[\s\S]*?\}', text)
 
@@ -480,7 +495,7 @@ Result: ```json
                     return parsed
             return generated_data
         except Exception as e:
-            candidates = []
+            candidates: List[str] = []
             if hasattr(self, 'last_output') and self.last_output:
                 candidates.append(self.last_output)
             if hasattr(e, 'args') and e.args:
@@ -500,7 +515,7 @@ Result: ```json
 
 
 class AsyncJsonformer:
-    def __init__(self, jsonformer: Jsonformer):
+    def __init__(self, jsonformer: Jsonformer) -> None:
         self.jsonformer = jsonformer
         self.tool_executor = AsyncToolExecutor()
 

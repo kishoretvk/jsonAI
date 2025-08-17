@@ -3,6 +3,7 @@ import xml.etree.ElementTree as ET
 import yaml
 import csv
 from collections import OrderedDict
+from typing import Any
 
 try:
     import pandas as pd
@@ -16,7 +17,13 @@ class OutputFormatter:
     A class for formatting data into JSON, XML, and YAML formats.
     """
 
-    def format(self, data, output_format='json', root_element='root', root_attributes=None):
+    def format(
+        self,
+        data: dict[str, Any],
+        output_format: str = 'json',
+        root_element: str = 'root',
+        root_attributes: dict[str, Any] | None = None
+    ) -> str:
         """
         Format data into the specified output format.
 
@@ -38,20 +45,25 @@ class OutputFormatter:
             return self._dict_to_xml(data, root_element, root_attributes)
         elif output_format == 'yaml':
             # Define a custom representer for OrderedDict
-            def represent_ordereddict(dumper, data):
+            def represent_ordereddict(dumper: yaml.Dumper, data: OrderedDict[str, Any]) -> yaml.nodes.MappingNode:
                 return dumper.represent_dict(data.items())
 
             yaml.add_representer(OrderedDict, represent_ordereddict, Dumper=yaml.Dumper)
 
             # Convert dictionary to OrderedDict for consistent YAML output
-            ordered_data = OrderedDict([('name', data['name']), ('age', data['age'])])
-            return yaml.dump(ordered_data, Dumper=yaml.Dumper, sort_keys=False)
+            ordered_data: OrderedDict[str, Any] = OrderedDict([('name', data['name']), ('age', data['age'])])
+            return str(yaml.dump(ordered_data, Dumper=yaml.Dumper, sort_keys=False))
         elif output_format == 'csv':
             return self._dict_to_csv(data)
         else:
             raise ValueError(f"Unsupported output format: {output_format}")
 
-    def _dict_to_xml(self, data, root_element='root', root_attributes=None):
+    def _dict_to_xml(
+        self,
+        data: dict[str, Any],
+        root_element: str = 'root',
+        root_attributes: dict[str, Any] | None = None
+    ) -> str:
         """
         Convert a dictionary to an XML string.
 
@@ -70,7 +82,11 @@ class OutputFormatter:
         self._add_dict_to_xml(root, data)
         return ET.tostring(root, encoding='unicode')
 
-    def _add_dict_to_xml(self, parent, data):
+    def _add_dict_to_xml(
+        self,
+        parent: ET.Element,
+        data: object
+    ) -> None:
         """
         Recursively add dictionary data to an XML element.
 
@@ -94,7 +110,7 @@ class OutputFormatter:
         else:
             raise TypeError(f"Unsupported data type: {type(data)}")
 
-    def _dict_to_csv(self, data):
+    def _dict_to_csv(self, data: dict[str, Any] | list[dict[str, Any]]) -> str:
         """
         Convert a dictionary or list of dicts to a CSV string.
         Uses pandas if available for tabular data.

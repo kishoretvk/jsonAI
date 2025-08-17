@@ -8,7 +8,7 @@ capabilities to enhance the efficiency of JSON generation operations.
 import asyncio
 import json
 import time
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Callable
 from collections import defaultdict
 from cachetools import TTLCache, LRUCache
 import hashlib
@@ -84,17 +84,47 @@ class PerformanceMonitor:
 
 class CachedJsonformer(Jsonformer):
     """Jsonformer with intelligent caching capabilities."""
-    
-    def __init__(self, model, tokenizer, schema: Dict[str, Any], 
-                 cache_size: int = 1000, cache_ttl: int = 3600):
-        super().__init__(model, tokenizer, schema)
-        
+
+    def __init__(
+        self,
+        model_backend: Any,
+        json_schema: Dict[str, Any],
+        prompt: str,
+        *,
+        output_format: str = "json",
+        validate_output: bool = False,
+        debug: bool = False,
+        max_array_length: int = 10,
+        max_number_tokens: int = 6,
+        temperature: float = 1.0,
+        max_string_token_length: int = 175,
+        tool_registry: Optional[object] = None,
+        mcp_callback: Optional[Callable] = None,
+        cache_size: int = 1000,
+        cache_ttl: int = 3600,
+    ):
+        super().__init__(
+            model_backend=model_backend,
+            json_schema=json_schema,
+            prompt=prompt,
+            output_format=output_format,
+            validate_output=validate_output,
+            debug=debug,
+            max_array_length=max_array_length,
+            max_number_tokens=max_number_tokens,
+            temperature=temperature,
+            max_string_token_length=max_string_token_length,
+            tool_registry=tool_registry,
+            mcp_callback=mcp_callback,
+        )
+        self.schema = json_schema
+
         # LRU cache for schema-based results
         self.schema_cache = LRUCache(maxsize=cache_size // 2)
-        
-        # TTL cache for prompt-based results  
+
+        # TTL cache for prompt-based results
         self.prompt_cache = TTLCache(maxsize=cache_size // 2, ttl=cache_ttl)
-        
+
         self.monitor = PerformanceMonitor()
         
     def _get_cache_key(
@@ -117,29 +147,29 @@ class CachedJsonformer(Jsonformer):
     def generate(self, prompt: str, **kwargs) -> Dict[str, Any]:
         """Generate JSON with caching support."""
         cache_key = self._get_cache_key(prompt, self.schema, **kwargs)
-        
+
         # Check caches
         if cache_key in self.prompt_cache:
             return self.prompt_cache[cache_key]
-            
+
         if cache_key in self.schema_cache:
             return self.schema_cache[cache_key]
-            
+
         # Generate and cache result
-        # Use synchronous timing instead of async context manager inside sync method
         self.monitor.start_operation('generation')
         try:
-            result = super().generate(prompt, **kwargs)
+            # Use generate_data from Jsonformer
+            result = self.generate_data()
         finally:
             self.monitor.end_operation('generation')
-            
+
         # Store in appropriate cache based on complexity
         schema_complexity = self._calculate_schema_complexity()
         if schema_complexity > 10:  # Complex schemas use TTL cache
             self.prompt_cache[cache_key] = result
         else:  # Simple schemas use LRU cache
             self.schema_cache[cache_key] = result
-            
+
         return result
         
     def _calculate_schema_complexity(self) -> int:
@@ -257,17 +287,48 @@ class BatchProcessor:
 
 class OptimizedJsonformer(CachedJsonformer):
     """Highly optimized Jsonformer with all performance features enabled."""
-    
-    def __init__(self, model, tokenizer, schema: Dict[str, Any],
-                 cache_size: int = 2000, cache_ttl: int = 7200,
-                 enable_batch_processing: bool = True,
-                 max_concurrent: int = 10):
-        super().__init__(model, tokenizer, schema, cache_size, cache_ttl)
-        
+
+    def __init__(
+        self,
+        model_backend: Any,
+        json_schema: Dict[str, Any],
+        prompt: str,
+        *,
+        output_format: str = "json",
+        validate_output: bool = False,
+        debug: bool = False,
+        max_array_length: int = 10,
+        max_number_tokens: int = 6,
+        temperature: float = 1.0,
+        max_string_token_length: int = 175,
+        tool_registry: Optional[object] = None,
+        mcp_callback: Optional[Callable] = None,
+        cache_size: int = 2000,
+        cache_ttl: int = 7200,
+        enable_batch_processing: bool = True,
+        max_concurrent: int = 10,
+    ):
+        super().__init__(
+            model_backend=model_backend,
+            json_schema=json_schema,
+            prompt=prompt,
+            output_format=output_format,
+            validate_output=validate_output,
+            debug=debug,
+            max_array_length=max_array_length,
+            max_number_tokens=max_number_tokens,
+            temperature=temperature,
+            max_string_token_length=max_string_token_length,
+            tool_registry=tool_registry,
+            mcp_callback=mcp_callback,
+            cache_size=cache_size,
+            cache_ttl=cache_ttl,
+        )
+
         self.enable_batch_processing = enable_batch_processing
         if enable_batch_processing:
             self.batch_processor = BatchProcessor(self, max_concurrent)
-            
+
         # Additional optimizations
         self._warmup_cache()
         
@@ -315,7 +376,7 @@ class OptimizedJsonformer(CachedJsonformer):
             
         return stats
         
-    def optimize_for_schema(self, sample_prompts: List[str] = None):
+    def optimize_for_schema(self, sample_prompts: Optional[List[str]] = None):
         """Optimize the instance for the current schema."""
         if sample_prompts:
             # Pre-generate with sample prompts to populate caches
@@ -324,10 +385,10 @@ class OptimizedJsonformer(CachedJsonformer):
                     self.generate(prompt)
                 except Exception:
                     continue
-                    
+
         # Calculate optimal cache sizes based on schema complexity
         complexity = self._calculate_schema_complexity()
-        
+
         if complexity > 50:  # Very complex schemas
             self.prompt_cache = TTLCache(maxsize=500, ttl=1800)  # Shorter TTL
             self.schema_cache = LRUCache(maxsize=100)  # Smaller cache

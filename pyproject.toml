@@ -48,6 +48,7 @@ opentelemetry-instrumentation-asgi = "^0.45b0"
 
 [tool.poetry.group.dev.dependencies]
 pandas = "^2.2.2"
+pandas-stubs = { version = "^2.3.0.250703", python = ">=3.10,<4.0" }
 ipykernel = "^6.22.0"
 torch = "^2.0.0"
 accelerate = "^0.18.0"

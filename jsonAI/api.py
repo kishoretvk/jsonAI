@@ -65,7 +65,7 @@ class BatchGenerationRequest(BaseModel):
 class GenerationResponse(BaseModel):
     """Response model for JSON generation."""
     id: str = Field(..., description="Unique identifier for the request")
-    result: Dict[str, Any] = Field(..., description="Generated JSON result")
+    json_result: Dict[str, Any] = Field(..., description="Generated JSON result")
     status: str = Field(..., description="Request status")
     duration: Optional[float] = Field(None, description="Generation duration in seconds")
     timestamp: str = Field(..., description="Response timestamp")
@@ -109,6 +109,9 @@ async def get_jsonformer(request: GenerationRequest) -> Union[Jsonformer, Optimi
             # Get model and tokenizer
             if cache_key not in _model_cache:
                 # Resolve model/tokenizer based on provider
+                from typing import Any
+                model: Any
+                tokenizer: Any
                 if request.model_name.lower() == "ollama":
                     from .model_backends import OllamaBackend, DummyTokenizer
                     model = OllamaBackend(model_name=request.model_path or "llama3")
@@ -132,17 +135,13 @@ async def get_jsonformer(request: GenerationRequest) -> Union[Jsonformer, Optimi
             
             # Create optimized jsonformer (expects model_backend + schema + prompt)
             # Wrap provided (model, tokenizer) in a backend-like object if needed
-            from .model_backends import ModelBackend, DummyBackend
-            if isinstance(model, ModelBackend):
-                backend = model
-            else:
-                # If 'model' is not a ModelBackend, fall back to DummyBackend for compatibility
-                backend = DummyBackend()
+            from typing import Any
+            backend: Any = model
             # OptimizedJsonformer inherits Jsonformer signature (model_backend, json_schema, prompt, ...)
             jsonformer = OptimizedJsonformer(
-                model=backend,
-                tokenizer=tokenizer,
-                schema=request.schema,
+                model_backend=backend,
+                json_schema=request.schema,
+                prompt=request.prompt,
                 cache_size=1000,
                 cache_ttl=3600
             )
@@ -192,7 +191,7 @@ async def generate_json(request: GenerationRequest):
         performance_monitor.start_operation(f"generate_{request_id}")
         
         # Generate JSON
-        result = jsonformer.generate(
+        json_result = jsonformer.generate(
             prompt=request.prompt,
             max_tokens=request.max_tokens,
             temperature=request.temperature,
@@ -204,7 +203,7 @@ async def generate_json(request: GenerationRequest):
         
         return GenerationResponse(
             id=request_id,
-            result=result,
+            json_result=json_result,
             status="success",
             duration=duration,
             timestamp=datetime.now().isoformat()
@@ -263,7 +262,7 @@ async def generate_json_async(request: GenerationRequest):
         
         return GenerationResponse(
             id=request_id,
-            result=result,
+            json_result=result,
             status="success",
             duration=None,  # Will be filled by monitoring
             timestamp=datetime.now().isoformat()
@@ -320,7 +319,7 @@ async def generate_json_batch(batch_request: BatchGenerationRequest):
                     
                     return GenerationResponse(
                         id=request_id,
-                        result=result,
+                        json_result=result,
                         status="success",
                         duration=duration,
                         timestamp=datetime.now().isoformat()
@@ -332,7 +331,7 @@ async def generate_json_batch(batch_request: BatchGenerationRequest):
                     
                     return GenerationResponse(
                         id=request_id,
-                        result={"error": str(e)},
+                        json_result={"error": str(e)},
                         status="error",
                         duration=None,
                         timestamp=datetime.now().isoformat()

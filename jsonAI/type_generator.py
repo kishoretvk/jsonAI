@@ -103,9 +103,10 @@ class TypeGenerator:
         self.debug("[_generate_with_processor]", prompt, is_prompt=True)
 
         if isinstance(self.model_backend, TransformersBackend):
-            input_tokens = self.model_backend.tokenizer.encode(prompt, return_tensors="pt").to(
-                self.model_backend.model.device
-            )
+            input_tokens = self.model_backend.tokenizer.encode(prompt, return_tensors="pt")
+            model_device = getattr(getattr(self.model_backend, "model", None), "device", "cpu")
+            if hasattr(input_tokens, "to") and callable(getattr(input_tokens, "to")):
+                input_tokens = input_tokens.to(model_device)
             try:
                 generate_args = dict(
                     input_ids=input_tokens,
@@ -113,7 +114,9 @@ class TypeGenerator:
                     logits_processor=logits_processor,
                     stopping_criteria=stopping_criteria,
                 )
-                model = self.model_backend.model
+                model = getattr(self.model_backend, "model", None)
+                if model is None:
+                    raise RuntimeError("Backend does not provide a model attribute required for generation.")
                 if hasattr(model, "generate"):
                     generate_args["max_new_tokens"] = max_tokens
                 else:
@@ -282,7 +285,10 @@ class TypeGenerator:
 
         if hasattr(self.model_backend, "tokenizer"):
             input_tensor = self.model_backend.tokenizer.encode(prompt, return_tensors="pt")
-            output = self.model_backend.model.forward(input_tensor.to(self.model_backend.model.device))
+            model = getattr(self.model_backend, "model", None)
+            if model is None:
+                raise NotImplementedError("The backend does not provide a model attribute required for boolean generation.")
+            output = model.forward(input_tensor.to(getattr(model, "device", "cpu")))
             logits = output.logits
             # Ensure logits is always 2D for DummyModel, but robust for real models
             import numpy as np
@@ -389,15 +395,17 @@ class TypeGenerator:
         tokenizer_any: Any = getattr(self.model_backend, "tokenizer", None)
         if model_any is None or tokenizer_any is None:
             raise NotImplementedError("Backend must provide model and tokenizer for probabilistic enums.")
-        input_ids = tokenizer_any.encode(prompt, return_tensors="pt").to(
-            getattr(model_any, "device", "cpu")
-        )[0]
+        input_ids = tokenizer_any.encode(prompt, return_tensors="pt")
+        device = getattr(model_any, "device", "cpu")
+        if hasattr(input_ids, "to") and callable(getattr(input_ids, "to")):
+            input_ids = input_ids.to(device)
+        input_ids = input_ids[0]
         values_tokens = tokenizer_any(values).input_ids
         values_tokens = [torch.tensor(c) for c in values_tokens]
         r = list(
             prob_choice_tree(
-                self.model_backend.model,
-                self.model_backend.tokenizer,
+                model_any,
+                tokenizer_any,
                 input_ids,
                 values_tokens,
                 round=round,

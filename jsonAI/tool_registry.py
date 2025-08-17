@@ -1,19 +1,21 @@
 from typing import Callable, Dict, Any, Union
 
+FunctionType = Callable[..., Any]
+
 class ToolRegistry:
     """
     A central registry for managing and accessing tools that can be called by Jsonformer.
     This includes standard Python functions and MCP (Model Context Protocol) tools.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """
         Initializes the ToolRegistry.
         """
-        self._functions: Dict[str, Callable] = {}
+        self._functions: Dict[str, FunctionType] = {}
         self._mcp_tools: Dict[str, Dict[str, Any]] = {}
 
-    def register(self, tool: Union[Callable, Dict[str, Any]]) -> None:
+    def register(self, tool: Union[FunctionType, Dict[str, Any]]) -> None:
         """
         Registers a tool. It can be a Python function or an MCP tool configuration.
 
@@ -30,7 +32,7 @@ class ToolRegistry:
         else:
             raise ValueError("Invalid tool type. Must be a callable function or a valid MCP tool dictionary.")
 
-    def _register_function(self, tool: Callable) -> None:
+    def _register_function(self, tool: FunctionType) -> None:
         """
         Registers a standard Python function.
 
@@ -62,7 +64,7 @@ class ToolRegistry:
             raise ValueError(f"MCP tool '{tool_name}' is already registered")
         self._mcp_tools[tool_name] = tool
 
-    def get_tool(self, name: str) -> Union[Callable, Dict[str, Any], None]:
+    def get_tool(self, name: str) -> Union[FunctionType, Dict[str, Any], None]:
         """
         Retrieves a tool by its registered name.
 
@@ -95,7 +97,7 @@ class ToolRegistry:
         else:
             raise ValueError(f"Tool '{name}' is not registered")
 
-    def list_tools(self) -> Dict[str, Union[Callable, Dict[str, Any]]]:
+    def list_tools(self) -> Dict[str, Union[FunctionType, Dict[str, Any]]]:
         """
         Lists all registered tools.
 

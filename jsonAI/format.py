@@ -1,11 +1,13 @@
 from termcolor import colored
 
 
-def highlight_values(value, return_as_string=False):
-    """Highlight values in nested data structures with an option to return as a string."""
-    output = []
+from typing import Any, Union
 
-    def recursive_print(obj, indent=0, is_last_element=True):
+def highlight_values(value: Any, return_as_string: bool = False) -> Union[str, None]:
+    """Highlight values in nested data structures with an option to return as a string."""
+    output: list[str] = []
+
+    def recursive_print(obj: Any, indent: int = 0, is_last_element: bool = True) -> None:
         if isinstance(obj, dict):
             output.append("{")
             last_key = list(obj.keys())[-1]
@@ -29,3 +31,4 @@ def highlight_values(value, return_as_string=False):
         return "".join(output)
     else:
         print("".join(output))
+    return None

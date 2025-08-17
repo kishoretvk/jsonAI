@@ -33,9 +33,13 @@ class FullAsyncJsonformer:
         self.max_array_length = max_array_length
         self.generation_marker = "|GENERATION|"
         
+        def _debug(caller: str, value: str, is_prompt: bool = False) -> None:
+            if self.debug_on:
+                print(f"{caller}: {value}")
+
         self.type_generator = TypeGenerator(
             model_backend=model_backend,
-            debug=self.debug_on,
+            debug=_debug,
             max_number_tokens=max_number_tokens,
             max_string_token_length=max_string_token_length,
             temperature=temperature,

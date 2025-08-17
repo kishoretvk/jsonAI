@@ -89,11 +89,11 @@ def _prob_choice_tree(
 
     next_choices = get_valid_next_choices(choices_tokens, current_tokens)
     if len(next_choices) == 0:
-        s = tokenizer.decode(current_tokens, skip_special_tokens=True)
+        s = tokenizer.decode(current_tokens, skip_special_tokens=True)  # type: ignore[attr-defined]
         r = dict(prob=prob, choice=s)
         yield r
     else:
-        o = model(input_ids[None])
+        o = model(input_ids[None])  # type: ignore[operator]
         logits_constrained = o.logits[0, -1][next_choices]
         probs = F.softmax(logits_constrained, dim=-1)
         for i in range(len(next_choices)):
@@ -112,11 +112,16 @@ def _prob_choice_tree(
 
 
 def prob_choice_tree(
-    *args,
+    model: AutoModelForCausalLM,
+    tokenizer: AutoTokenizer,
+    input_ids: Tensor,
+    choices_tokens: List[Tensor],
+    choice: Optional[Tensor] = None,
+    prob: float = 1,
+    current_tokens: Tensor = torch.LongTensor([]),
+    max_depth: Optional[int] = None,
     sort: bool = True,
     round=3,
-    max_depth: Optional[int] = None,
-    **kwargs,
 ):
     """
     Generate token sequences with probabilities.
@@ -131,9 +136,14 @@ def prob_choice_tree(
     """
     choice_json = list(
         _prob_choice_tree(
-            *args,
+            model=model,
+            tokenizer=tokenizer,
+            input_ids=input_ids,
+            choices_tokens=choices_tokens,
+            choice=choice,
+            prob=prob,
+            current_tokens=current_tokens,
             max_depth=max_depth,
-            **kwargs,
         )
     )
 

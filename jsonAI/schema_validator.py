@@ -1,4 +1,5 @@
 from jsonschema import validate, ValidationError
+from typing import Any
 
 
 class SchemaValidator:
@@ -6,7 +7,7 @@ class SchemaValidator:
     A class for validating data against JSON schemas.
     """
 
-    def validate(self, data, schema, raise_on_error: bool = False) -> bool:
+    def validate(self, data: dict[str, Any], schema: dict[str, Any], raise_on_error: bool = False) -> bool:
         """
         Validate data against a JSON schema.
 

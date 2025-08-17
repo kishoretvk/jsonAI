@@ -3,7 +3,7 @@ import os
 import io
 import json
 import hashlib
-from typing import Any, Dict, AsyncIterator
+from typing import Any, Dict, AsyncIterator, Optional
 
 from fastapi import FastAPI, Depends, Request, Response, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse, PlainTextResponse
@@ -82,7 +82,7 @@ if OBS_ENABLE_TRACING:
     trace.set_tracer_provider(tracer_provider)
 
     # Instrument FastAPI/ASGI
-    app.add_middleware(OpenTelemetryMiddleware)
+    app.add_middleware(OpenTelemetryMiddleware)  # type: ignore[arg-type]
     FastAPIInstrumentor.instrument_app(app)
 
 _oidc_config: OIDCConfig | None = None
@@ -102,28 +102,28 @@ async def require_auth(request: Request, validator: OIDCValidator = Depends(get_
 # --------- Request models ---------
 
 class JsonGenerateRequest(BaseModel):
-    schema: Dict[str, Any]
-    options: Dict[str, Any] | None = Field(default=None, description="seed, count etc.")
+    json_schema: Dict[str, Any]
+    json_options: Optional[Dict[str, Any]] = Field(default=None, description="seed, count etc.")
 
-class CsvGenerateRequest(BaseModel):
-    csvSchema: CsvSchema
-    options: Dict[str, Any] | None = None
+class CsvGenRequest(BaseModel):
+    only_field: CsvSchema
+    csv_options: Optional[Dict[str, Any]] = Field(default=None, description="rows, delimiter, header, seed etc.")
 
 class XmlGenerateRequest(BaseModel):
-    xmlSchema: XmlSchema
-    options: Dict[str, Any] | None = None
+    xml_schema: XmlSchema
+    xml_generation_options: Optional[Dict[str, Any]] = None
 
 class ValidateJsonRequest(BaseModel):
     schema: Dict[str, Any]
     data: Any
 
 class ValidateCsvRequest(BaseModel):
-    csvSchema: CsvSchema
+    csv_schema: CsvSchema
     sample: str | None = None
     path: str | None = None
 
 class ValidateXmlRequest(BaseModel):
-    xmlSchema: XmlSchema
+    xml_schema: XmlSchema
     sample: str | None = None
     path: str | None = None
 
@@ -136,14 +136,9 @@ def _deterministic_random(seed: int) -> int:
     return int(h[:8], 16)
 
 def _get_backend() -> ModelBackend:
-    # In this phase we rely on existing ModelBackend implementations;
-    # for deterministic Sprint 1, we will mainly use TypeGenerator deterministic branches.
-    # Assuming there exists a simple ModelBackend in the repo for basic calls.
-    from jsonAI.model_backends import ModelBackend  # type: ignore
-    # For now, we require a provided backend by env, or a dummy one can be implemented later.
-    # Placeholder: raise if not configured.
-    # In practice, you may wire a default DeterministicBackend.
-    backend: ModelBackend = ModelBackend()  # type: ignore
+    # Use DummyBackend for default/test purposes. Replace with env-driven backend selection as needed.
+    from jsonAI.model_backends import DummyBackend
+    backend: ModelBackend = DummyBackend()
     return backend
 
 
@@ -169,10 +164,10 @@ async def generate_json(req: JsonGenerateRequest, _: Dict[str, Any] = Depends(re
         duration = time.perf_counter() - start
         if OBS_ENABLE_METRICS:
             REQUEST_LATENCY.labels(method="POST", path="/generate/json").observe(duration)
-    schema = req.schema
-    options = req.options or {}
-    seed = int(options.get("seed", 42))
-    count = int(options.get("count", 1))
+    input_schema = req.json_schema
+    json_options: Dict[str, Any] = req.json_options or {}
+    json_seed_value: int = int(json_options.get("seed", 42))
+    count = int(json_options.get("count", 1))
 
     # Deterministic path: use Jsonformer directly for objects/arrays, or TypeGenerator for primitives
     from jsonAI.main import Jsonformer
@@ -181,8 +176,8 @@ async def generate_json(req: JsonGenerateRequest, _: Dict[str, Any] = Depends(re
     results: list[Any] = []
     for i in range(count):
         # For determinism, mix seed with i
-        _ = _deterministic_random(seed + i)
-        jf = Jsonformer(backend, schema, prompt="Generate structured data for tests", debug=False)
+        _ = _deterministic_random(json_seed_value + i)
+        jf = Jsonformer(backend, input_schema, prompt="Generate structured data for tests", debug=False)
         data = jf.generate_data()
         results.append(data)
 
@@ -195,7 +190,7 @@ async def generate_json(req: JsonGenerateRequest, _: Dict[str, Any] = Depends(re
     return JSONResponse(content={"data": results})
 
 @app.post("/generate/csv")
-async def generate_csv(req: CsvGenerateRequest, request: Request, _: Dict[str, Any] = Depends(require_auth)) -> Response:
+async def generate_csv(req: CsvGenRequest, request: Request, _: Dict[str, Any] = Depends(require_auth)) -> Response:
     start = time.perf_counter()
     try:
         # business logic below
@@ -204,28 +199,28 @@ async def generate_csv(req: CsvGenerateRequest, request: Request, _: Dict[str, A
         duration = time.perf_counter() - start
         if OBS_ENABLE_METRICS:
             REQUEST_LATENCY.labels(method="POST", path="/generate/csv").observe(duration)
-    schema = req.csvSchema
-    options = req.options or {}
-    rows = int(options.get("rows", schema.rows))
-    delimiter = options.get("delimiter", schema.delimiter)
-    header = bool(options.get("header", schema.header))
-    seed = int(options.get("seed", 42))
+    input_schema: Any = req.only_field
+    csv_options: Dict[str, Any] = req.csv_options or {}
+    num_rows: int = int(csv_options.get("rows", getattr(input_schema, "rows", 1)))
+    csv_delimiter: str = csv_options.get("delimiter", getattr(input_schema, "delimiter", ","))
+    csv_header: bool = bool(csv_options.get("header", getattr(input_schema, "header", True)))
+    csv_seed: int = int(csv_options.get("seed", 42))
 
     # Simple deterministic CSV emitter using TypeGenerator primitives
     backend = _get_backend()
     tg = TypeGenerator(model_backend=backend, debug=lambda *_args, **_kw: None)
 
-    def row_iter() -> AsyncIterator[bytes]:  # type: ignore[override]
+    def row_iter() -> AsyncIterator[bytes]:
         # async generator wrapper around a sync generator for FastAPI
         async def _aiter():
-            if header:
-                header_line = delimiter.join([c.name for c in schema.columns]) + "\n"
+            if csv_header:
+                header_line = csv_delimiter.join([c.name for c in input_schema.columns]) + "\n"
                 yield header_line.encode("utf-8")
-            for i in range(rows):
+            for i in range(num_rows):
                 # deterministic per-row seed application (not calling global RNG)
-                _ = _deterministic_random(seed + i)
+                _ = _deterministic_random(csv_seed + i)
                 values: list[str] = []
-                for col in schema.columns:
+                for col in input_schema.columns:
                     t = col.type
                     if t == "string":
                         values.append("example")
@@ -245,7 +240,7 @@ async def generate_csv(req: CsvGenerateRequest, request: Request, _: Dict[str, A
                         values.append(col.enumValues[0])
                     else:
                         values.append("example")
-                yield (delimiter.join(values) + "\n").encode("utf-8")
+                yield (csv_delimiter.join(values) + "\n").encode("utf-8")
         return _aiter()
 
     if OBS_ENABLE_METRICS:
@@ -262,16 +257,16 @@ async def generate_xml(req: XmlGenerateRequest, _: Dict[str, Any] = Depends(requ
         duration = time.perf_counter() - start
         if OBS_ENABLE_METRICS:
             REQUEST_LATENCY.labels(method="POST", path="/generate/xml").observe(duration)
-    schema = req.xmlSchema
-    options = req.options or {}
-    seed = int(options.get("seed", 42))
-    _ = _deterministic_random(seed)
+    input_schema = req.xml_schema
+    xml_generation_options = req.xml_generation_options or {}
+    xml_seed_value: int = int(xml_generation_options.get("seed", 42))
+    _ = _deterministic_random(xml_seed_value)
 
     # Minimal deterministic XML emission (v1): emit root and first occurrence of children
     buf = io.StringIO()
-    buf.write(f"<{schema.root}>")
+    buf.write(f"<{input_schema.root}>")
     # naive one-level traversal
-    for el in schema.elements:
+    for el in input_schema.elements:
         buf.write(f"<{el.name}>")
         if el.type == "string":
             buf.write("example")
@@ -292,7 +287,7 @@ async def generate_xml(req: XmlGenerateRequest, _: Dict[str, Any] = Depends(requ
         else:
             buf.write("example")
         buf.write(f"</{el.name}>")
-    buf.write(f"</{schema.root}>")
+    buf.write(f"</{input_schema.root}>")
     if OBS_ENABLE_METRICS:
         REQUEST_COUNT.labels(method="POST", path="/generate/xml", status="200").inc()
     return PlainTextResponse(content=buf.getvalue(), media_type="application/xml")
@@ -334,15 +329,15 @@ async def validate_csv(req: ValidateCsvRequest, _: Dict[str, Any] = Depends(requ
     if req.sample is None:
         raise HTTPException(status_code=400, detail="sample is required for CSV validation")
     errors: list[str] = []
-    delimiter = req.csvSchema.delimiter
-    expected_cols = [c.name for c in req.csvSchema.columns]
+    delimiter = req.csv_schema.delimiter
+    expected_cols = [c.name for c in req.csv_schema.columns]
     try:
         reader = csv.reader(io.StringIO(req.sample), delimiter=delimiter)
         rows = list(reader)
         if not rows:
             return JSONResponse(content={"valid": False, "errors": ["empty sample"]}, status_code=400)
         start_idx = 0
-        if req.csvSchema.header:
+        if req.csv_schema.header:
             header = rows[0]
             if header != expected_cols:
                 errors.append(f"header mismatch: expected {expected_cols}, got {header}")
@@ -379,8 +374,8 @@ async def validate_xml(req: ValidateXmlRequest, _: Dict[str, Any] = Depends(requ
     errors = []
     try:
         root = ET.fromstring(req.sample)
-        if root.tag != req.xmlSchema.root:
-            errors.append(f"root element mismatch: expected '{req.xmlSchema.root}', got '{root.tag}'")
+        if root.tag != req.xml_schema.root:
+            errors.append(f"root element mismatch: expected '{req.xml_schema.root}', got '{root.tag}'")
     except ET.ParseError as e:
         errors.append(f"XML parsing error: {e}")
     if errors:

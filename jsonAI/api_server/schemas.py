@@ -17,7 +17,7 @@ CsvPrimitiveType = Literal[
 ]
 
 class CsvColumn(BaseModel):
-    name: constr(strip_whitespace=True, min_length=1)
+    name: constr(strip_whitespace=True, min_length=1)  # type: ignore
     type: CsvPrimitiveType
     enumValues: Optional[List[str]] = None
     min: Optional[float] = None
@@ -28,7 +28,7 @@ class CsvColumn(BaseModel):
 
 class CsvSchema(BaseModel):
     columns: List[CsvColumn]
-    rows: conint(ge=1) = 1
+    rows: conint(ge=1) = 1  # type: ignore
     delimiter: str = ","
     header: bool = True
     encoding: str = "utf-8"
@@ -51,12 +51,12 @@ XmlPrimitiveType = Literal[
 ]
 
 class XmlAttribute(BaseModel):
-    name: constr(strip_whitespace=True, min_length=1)
+    name: constr(strip_whitespace=True, min_length=1)  # type: ignore
     type: XmlPrimitiveType = "string"
     required: bool = False
 
 class XmlElement(BaseModel):
-    name: constr(strip_whitespace=True, min_length=1)
+    name: constr(strip_whitespace=True, min_length=1)  # type: ignore
     type: XmlPrimitiveType = "object"
     attributes: Optional[List[XmlAttribute]] = None
     children: Optional[List["XmlElement"]] = None
@@ -66,7 +66,7 @@ class XmlElement(BaseModel):
     textPattern: Optional[str] = None
 
 class XmlSchema(BaseModel):
-    root: constr(strip_whitespace=True, min_length=1)
+    root: constr(strip_whitespace=True, min_length=1)  # type: ignore
     elements: List[XmlElement]
     namespaces: Optional[Dict[str, str]] = None
     xsdUrl: Optional[str] = None  # placeholder for future XSD ingestion

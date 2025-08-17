@@ -97,7 +97,7 @@ class OutputNumbersTokens(LogitsProcessor):
             ):
                 self.allowed_mask[token_id] = True
 
-    def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
+    def __call__(self, input_ids: torch.LongTensor, scores: torch.Tensor) -> torch.Tensor:
         mask = self.allowed_mask.expand_as(scores)
         scores = scores.clone()
         scores[~mask] = -float("inf")
@@ -166,7 +166,7 @@ class OutputIntegersTokens(LogitsProcessor):
             ):
                 self.allowed_mask[token_id] = True
 
-    def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
+    def __call__(self, input_ids: torch.LongTensor, scores: torch.Tensor) -> torch.Tensor:
         mask = self.allowed_mask.expand_as(scores)
         scores = scores.clone()
         scores[~mask] = -float("inf")
