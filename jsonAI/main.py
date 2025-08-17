@@ -41,6 +41,9 @@ class Jsonformer:
         max_string_token_length: int = 175,
         tool_registry: Optional[object] = None,
         mcp_callback: Optional[Callable[[str, str, Dict[str, Any]], Any]] = None,
+        fallback_order: Optional[List[str]] = None,
+        llm_retries: int = 1,
+        fallback_hooks: Optional[Dict[str, Callable[[Dict[str, Any]], Any]]] = None,
     ):
         self.model_backend = model_backend
         self.json_schema = json_schema
@@ -50,6 +53,10 @@ class Jsonformer:
         self.tool_registry = tool_registry
         self.mcp_callback = mcp_callback
         self.debug_on = debug
+
+        self.fallback_order = fallback_order or ["llm", "deterministic", "random"]
+        self.llm_retries = llm_retries
+        self.fallback_hooks = fallback_hooks or {}
 
         self.debug("[__init__] Initialized tool_registry", str(self.tool_registry))
         self.debug("[__init__] Initialized mcp_callback", str(self.mcp_callback))
@@ -323,33 +330,111 @@ Result: ```json
         return None
 
     def _deterministic_value_for_schema(self, schema: Dict[str, Any]) -> Any:
-        """Deterministically synthesize data that satisfies common JSON Schema shapes."""
-        # Enum takes priority
-        if "enum" in schema and isinstance(schema["enum"], list) and schema["enum"]:
-            return schema["enum"][0]
+        """Synthesize data that satisfies common JSON Schema shapes, using smart fallback strategies and user hooks."""
+        import random
+        try:
+            from faker import Faker
+            faker = Faker()
+        except ImportError:
+            faker = None
 
+        # User-defined fallback hooks (by field or type)
+        field = schema.get("title") or schema.get("name")
         stype = schema.get("type")
+        fmt = schema.get("format")
+        # Field-specific hook
+        if field and field in self.fallback_hooks:
+            hook_result = self.fallback_hooks[field](schema)
+            if hook_result is not None:
+                return hook_result
+        # Type-specific hook
+        if stype and f"type:{stype}" in self.fallback_hooks:
+            hook_result = self.fallback_hooks[f"type:{stype}"](schema)
+            if hook_result is not None:
+                return hook_result
+        # Format-specific hook
+        if fmt and f"format:{fmt}" in self.fallback_hooks:
+            hook_result = self.fallback_hooks[f"format:{fmt}"](schema)
+            if hook_result is not None:
+                return hook_result
+
+        # Try prob_choice_tree fallback if model/tokenizer available
+        try:
+            from jsonAI.prob_choice_tree import prob_choice_tree
+            from jsonAI.type_prefixes import TypePrefixIdentifier
+            if hasattr(self.model_backend, "model") and hasattr(self.model_backend, "tokenizer"):
+                model = self.model_backend.model
+                tokenizer = self.model_backend.tokenizer
+                # Only attempt for primitives
+                if stype in {"string", "number", "integer", "boolean"}:
+                    vocab = list(tokenizer.vocab.keys())
+                    if stype == "string":
+                        valid_tokens = [k for k in vocab if TypePrefixIdentifier.is_string_prefix(k)]
+                    elif stype == "number":
+                        valid_tokens = [k for k in vocab if TypePrefixIdentifier.is_number_prefix(k)]
+                    elif stype == "integer":
+                        valid_tokens = [k for k in vocab if TypePrefixIdentifier.is_number_prefix(k)]
+                    elif stype == "boolean":
+                        valid_tokens = [k for k in vocab if TypePrefixIdentifier.is_boolean_prefix(k)]
+                    else:
+                        valid_tokens = []
+                    choices_tokens = [tokenizer.encode(v, return_tensors="pt").squeeze(0) for v in valid_tokens]
+                    input_ids = tokenizer.encode("", return_tensors="pt").squeeze(0)
+                    results = prob_choice_tree(
+                        model=model,
+                        tokenizer=tokenizer,
+                        input_ids=input_ids,
+                        choices_tokens=choices_tokens,
+                        sort=True,
+                        round=3,
+                        max_depth=1,
+                    )
+                    if results:
+                        return results[0]["choice"]
+        except Exception:
+            pass
+
+        # Use schema default if present
+        if "default" in schema:
+            return schema["default"]
+
+        # Enum takes priority, random choice for fallback
+        if "enum" in schema and isinstance(schema["enum"], list) and schema["enum"]:
+            return random.choice(schema["enum"])
+
+        # Faker/format-aware fallback for strings
         if stype == "string":
-            if schema.get("format") == "email":
-                return "user@example.com"
-            return "example"
+            if fmt == "email" and faker:
+                return faker.email()
+            if fmt == "date" and faker:
+                return faker.date()
+            if fmt == "date-time" and faker:
+                return faker.iso8601()
+            if fmt == "uuid" and faker:
+                return faker.uuid4()
+            if fmt == "ipv4" and faker:
+                return faker.ipv4()
+            if fmt == "ipv6" and faker:
+                return faker.ipv6()
+            if faker:
+                return faker.word()
+            return ''.join(random.choices('abcdefghijklmnopqrstuvwxyz', k=8))
         if stype == "number":
-            return 1.0
+            return round(random.uniform(1, 1000), 2)
         if stype == "integer":
-            return 1
+            return random.randint(1, 1000)
         if stype == "boolean":
-            return True
+            return random.choice([True, False])
         if stype == "null":
             return None
         if stype == "array":
             items = schema.get("items", {})
-            # produce two items deterministically
-            return [self._deterministic_value_for_schema(items), self._deterministic_value_for_schema(items)]
+            arr_len = random.randint(schema.get("minItems", 1), schema.get("maxItems", 3) if "maxItems" in schema else 3)
+            return [self._deterministic_value_for_schema(items) for _ in range(arr_len)]
         if stype == "object":
             result: Dict[str, Any] = {}
             props: Dict[str, Any] = schema.get("properties", {}) or {}
             required = schema.get("required", []) or []
-            # fill required first, then remaining keys
             keys = list(dict.fromkeys([*required, *props.keys()]))  # preserve order, remove dups
             for key in keys:
                 child_schema = props.get(key, {"type": "string"})
@@ -423,45 +508,73 @@ Result: ```json
         return self.output_formatter.sanitize_primitive(value, schema_type)
 
     def generate_data(self) -> Any:
-        """Generate structured data for any JSON schema type (primitives, arrays, objects, enums, null)"""
+        """Generate structured data for any JSON schema type (primitives, arrays, objects, enums, null) with configurable fallback and retry logic."""
         import json as _json
         self.value = {}
         self.debug("[generate_data] Initialized self.value", str(self.value))
-        try:
-            schema = self.json_schema
-            schema_type = schema.get("type")
+        schema = self.json_schema
+        schema_type = schema.get("type")
+        validator = self.schema_validator if self.validate_output else None
 
-            # Enum support
-            if "enum" in schema:
-                enum_values = schema["enum"]
-                value = enum_values[0]
-                return self.output_formatter.sanitize_primitive(value, "enum", enum_values=enum_values)
+        last_exception = None
 
-            if schema_type == "object" and "properties" in schema:
-                return self._generate_for_object(schema)
+        for strategy in self.fallback_order:
+            try:
+                if strategy == "llm":
+                    # Retry logic for LLM/model generation
+                    for attempt in range(self.llm_retries):
+                        try:
+                            # Enum support
+                            if "enum" in schema:
+                                enum_values = schema["enum"]
+                                value = enum_values[0]
+                                result = self.output_formatter.sanitize_primitive(value, "enum", enum_values=enum_values)
+                            elif schema_type == "object" and "properties" in schema:
+                                result = self._generate_for_object(schema)
+                            elif schema_type == "array" and "items" in schema:
+                                result = self._generate_for_array(schema)
+                            elif schema_type in {"string", "number", "integer", "boolean", "null"}:
+                                result = self._generate_for_primitives(schema)
+                            elif "oneOf" in schema:
+                                first = schema["oneOf"][0]
+                                result = Jsonformer(self.model_backend, first, self.prompt).generate_data()
+                            elif schema_type == "csv" and "columns" in schema:
+                                columns = schema["columns"]
+                                csv_str = ",".join(columns) + "\n" + ",".join(["dummy" for _ in columns])
+                                self.value = {"csv": csv_str}
+                                self.debug("[generate_data] Generated CSV data", csv_str)
+                                result = csv_str
+                            else:
+                                raise ValueError(f"Unsupported or malformed schema: {schema}")
 
-            if schema_type == "array" and "items" in schema:
-                return self._generate_for_array(schema)
+                            # Validate result
+                            if validator:
+                                validator.validate(result, schema)
+                            self.debug(f"[generate_data] Used LLM/Jsonformer generation (attempt {attempt+1})", "")
+                            return result
+                        except Exception as e:
+                            self.debug(f"[generate_data] LLM/Jsonformer generation failed (attempt {attempt+1})", str(e))
+                            last_exception = e
+                            if attempt == self.llm_retries - 1:
+                                raise
+                elif strategy == "deterministic":
+                    result = self._deterministic_value_for_schema(schema)
+                    if validator:
+                        validator.validate(result, schema)
+                    self.debug("[generate_data] Used deterministic fallback", "")
+                    return result
+                elif strategy == "random":
+                    result = self._deterministic_value_for_schema(schema)
+                    self.debug("[generate_data] Used random/tool-generated fallback", "")
+                    return result
+                else:
+                    raise ValueError(f"Unknown fallback strategy: {strategy}")
+            except Exception as e:
+                self.debug(f"[generate_data] {strategy} strategy failed", str(e))
+                last_exception = e
+                continue
 
-            if schema_type in {"string", "number", "integer", "boolean", "null"}:
-                return self._generate_for_primitives(schema)
-
-            if "oneOf" in schema:
-                first = schema["oneOf"][0]
-                return Jsonformer(self.model_backend, first, self.prompt).generate_data()
-
-            if schema_type == "csv" and "columns" in schema:
-                columns = schema["columns"]
-                csv_str = ",".join(columns) + "\n" + ",".join(["dummy" for _ in columns])
-                self.value = {"csv": csv_str}
-                self.debug("[generate_data] Generated CSV data", csv_str)
-                return csv_str
-
-            raise ValueError(f"Unsupported or malformed schema: {schema}")
-        except Exception as e:
-            self.debug("[generate_data] Exception occurred", str(e))
-            self.debug("[generate_data] Stack trace", traceback.format_exc())
-            raise
+        raise RuntimeError("All generation strategies failed") from last_exception
 
     def generate(self, prompt: str, **kwargs: Any) -> Any:
         """Compatibility method for subclasses expecting a generate method."""

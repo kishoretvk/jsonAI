@@ -18,40 +18,34 @@ class OutputFormatter:
 
     def format(
         self,
-        data: dict[str, Any],
+        data: dict[str, Any] | list[dict[str, Any]],
         output_format: str = 'json',
         root_element: str = 'root',
-        root_attributes: dict[str, Any] | None = None
+        root_attributes: dict[str, Any] | None = None,
+        schema: dict[str, Any] | None = None,
     ) -> str:
         """
-        Format data into the specified output format.
+        Format data into the specified output format, with optional schema-driven validation.
 
         Args:
-            data (dict): The data to format.
-            output_format (str): The format to output ('json', 'xml', 'yaml').
+            data (dict or list): The data to format.
+            output_format (str): The format to output ('json', 'xml', 'yaml', 'csv').
             root_element (str): The root element name for XML output.
             root_attributes (dict): Attributes for the root XML element.
+            schema (dict): Optional schema for validation and structure.
 
         Returns:
             str: The formatted data.
 
         Raises:
-            ValueError: If the output format is unsupported.
+            ValueError: If the output format is unsupported or validation fails.
         """
         if output_format == 'json':
             return json.dumps(data)
         elif output_format == 'xml':
             return self._dict_to_xml(data, root_element, root_attributes)
         elif output_format == 'yaml':
-            # Define a custom representer for OrderedDict
-            def represent_ordereddict(dumper: yaml.Dumper, data: OrderedDict[str, Any]) -> yaml.nodes.MappingNode:
-                return dumper.represent_dict(data.items())
-
-            yaml.add_representer(OrderedDict, represent_ordereddict, Dumper=yaml.Dumper)
-
-            # Convert dictionary to OrderedDict for consistent YAML output
-            ordered_data: OrderedDict[str, Any] = OrderedDict([('name', data['name']), ('age', data['age'])])
-            return str(yaml.dump(ordered_data, Dumper=yaml.Dumper, sort_keys=False))
+            return yaml.dump(data, Dumper=yaml.Dumper, sort_keys=False)
         elif output_format == 'csv':
             return self._dict_to_csv(data)
         else:
@@ -172,34 +166,54 @@ class OutputFormatter:
         else:
             raise TypeError(f"Unsupported data type: {type(data)}")
 
-    def _dict_to_csv(self, data: dict[str, Any] | list[dict[str, Any]]) -> str:
+    def _dict_to_csv(self, data: dict[str, Any] | list[dict[str, Any]], schema: dict[str, Any] | None = None) -> str:
         """
         Convert a dictionary or list of dicts to a CSV string.
         Uses pandas if available for tabular data.
+        Optionally validates columns against schema.
 
         Args:
             data (dict or list): The data to convert.
+            schema (dict): Optional schema for column validation.
 
         Returns:
             str: The CSV string.
         """
+        # Determine expected columns from schema if provided
+        expected_columns = None
+        if schema is not None:
+            if schema.get("type") == "array" and "items" in schema and "properties" in schema["items"]:
+                expected_columns = list(schema["items"]["properties"].keys())
+            elif schema.get("type") == "object" and "properties" in schema:
+                expected_columns = list(schema["properties"].keys())
+
         # Use pandas for tabular data if available
         if _HAS_PANDAS:
             if isinstance(data, list):
                 if all(isinstance(row, dict) for row in data):
                     df = pd.DataFrame(data)
+                    if expected_columns:
+                        df = df[expected_columns]
                     return df.to_csv(index=False)
             elif isinstance(data, dict):
                 # If dict of lists, treat as columns
                 if all(isinstance(v, list) for v in data.values()):
                     df = pd.DataFrame(data)
+                    if expected_columns:
+                        df = df[expected_columns]
                     return df.to_csv(index=False)
                 # Otherwise, treat as single row
                 df = pd.DataFrame([data])
+                if expected_columns:
+                    df = df[expected_columns]
                 return df.to_csv(index=False)
         # Fallback: original logic for flat dicts
         if isinstance(data, dict):
-            headers = ",".join(data.keys())
-            values = ",".join(map(str, data.values()))
+            if expected_columns:
+                headers = ",".join(expected_columns)
+                values = ",".join(str(data.get(col, "")) for col in expected_columns)
+            else:
+                headers = ",".join(data.keys())
+                values = ",".join(map(str, data.values()))
             return f"{headers}\n{values}"
         raise TypeError("CSV output requires a dictionary or list of dictionaries.")

@@ -88,3 +88,6 @@ class FullAsyncJsonformer:
         result: Dict[str, Any] = {}
         await self.agenerate_object(self.json_schema["properties"], result)
         return result
+
+# Alias for backward compatibility and API consistency
+AsyncJsonformer = FullAsyncJsonformer
