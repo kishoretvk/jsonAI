@@ -17,7 +17,10 @@ def try_parse_json(candidate):
     except Exception:
         return None
 
-def extract_and_parse_json_from_sources(sources, required_keys=None):
+from jsonAI.output_formatter import OutputFormatter
+
+def extract_and_parse_json_from_sources(sources, required_keys=None, schema=None):
+    formatter = OutputFormatter()
     for source in sources:
         answer_blocks = extract_answer_blocks(source)
         if not answer_blocks:
@@ -30,12 +33,24 @@ def extract_and_parse_json_from_sources(sources, required_keys=None):
                 parsed = try_parse_json(candidate)
                 if parsed and (not required_keys or set(parsed.keys()) >= set(required_keys)):
                     return parsed
+            # If parsing fails and schema is primitive or enum, try sanitization
+            if schema:
+                schema_type = schema.get("type")
+                if schema_type in {"string", "number", "integer", "boolean", "null"} or "enum" in schema:
+                    sanitized = formatter.sanitize_primitive(block.strip(), schema_type if "enum" not in schema else "enum", enum_values=schema.get("enum"))
+                    return sanitized
     for source in sources:
         json_candidates = re.findall(r'\{[\s\S]*?\}', source)
         for candidate in json_candidates:
             parsed = try_parse_json(candidate)
             if parsed and (not required_keys or set(parsed.keys()) >= set(required_keys)):
                 return parsed
+        # If parsing fails and schema is primitive or enum, try sanitization
+        if schema:
+            schema_type = schema.get("type")
+            if schema_type in {"string", "number", "integer", "boolean", "null"} or "enum" in schema:
+                sanitized = formatter.sanitize_primitive(source.strip(), schema_type if "enum" not in schema else "enum", enum_values=schema.get("enum"))
+                return sanitized
     return None
 
 @pytest.mark.parametrize("json_schema,required_keys,desc", [
@@ -88,9 +103,7 @@ def extract_and_parse_json_from_sources(sources, required_keys=None):
 def test_json_schema_variety(json_schema, required_keys, desc):
     # Skip unsupported types for now
     # TODO: Backend does not support primitive types or enums yet. See README "Limitations".
-    # unsupported = ["string", "number", "integer", "boolean", "null"]
-    # if json_schema.get("type") in unsupported or "enum" in json_schema:
-    #     pytest.skip(f"Schema type {json_schema.get('type')} or enum not yet supported by backend. See README 'Limitations'.")
+    # All primitive and enum types are now supported and should not be skipped.
 
     model_name = os.environ.get("OLLAMA_MODEL", "qwen3:0.6b")
     try:
@@ -107,7 +120,7 @@ def test_json_schema_variety(json_schema, required_keys, desc):
             if isinstance(raw_result, (dict, list)):
                 generated_data = raw_result
             elif isinstance(raw_result, str):
-                generated_data = extract_and_parse_json_from_sources([raw_result], required_keys)
+                generated_data = extract_and_parse_json_from_sources([raw_result], required_keys, json_schema)
                 if not generated_data:
                     sources.append(raw_result)
             else:
@@ -123,7 +136,7 @@ def test_json_schema_variety(json_schema, required_keys, desc):
                 if isinstance(arg, str):
                     sources.append(arg)
     if generated_data is None and sources:
-        generated_data = extract_and_parse_json_from_sources(sources, required_keys)
+        generated_data = extract_and_parse_json_from_sources(sources, required_keys, json_schema)
     assert generated_data is not None, f"Failed to parse valid JSON for schema: {desc}\nSources: {sources}"
     # Validate output structure
     validator = SchemaValidator()

@@ -402,21 +402,25 @@ Result: ```json
         ]
 
     def _generate_for_primitives(self, schema: Dict[str, Any]) -> Any:
-        """Generate data for primitive types."""
+        """Generate data for primitive types, sanitized for strict JSON compliance."""
         schema_type = schema.get("type")
+        value = None
         if schema_type == "string":
             if schema.get("format") == "email":
-                return "dummy@example.com"
-            return "example string"
-        if schema_type == "number":
-            return 42.0
-        if schema_type == "integer":
-            return 7
-        if schema_type == "boolean":
-            return True
-        if schema_type == "null":
-            return None
-        raise ValueError(f"Unsupported primitive schema: {schema_type}")
+                value = "dummy@example.com"
+            else:
+                value = "example string"
+        elif schema_type == "number":
+            value = 42.0
+        elif schema_type == "integer":
+            value = 7
+        elif schema_type == "boolean":
+            value = True
+        elif schema_type == "null":
+            value = None
+        else:
+            raise ValueError(f"Unsupported primitive schema: {schema_type}")
+        return self.output_formatter.sanitize_primitive(value, schema_type)
 
     def generate_data(self) -> Any:
         """Generate structured data for any JSON schema type (primitives, arrays, objects, enums, null)"""
@@ -429,7 +433,9 @@ Result: ```json
 
             # Enum support
             if "enum" in schema:
-                return schema["enum"][0]
+                enum_values = schema["enum"]
+                value = enum_values[0]
+                return self.output_formatter.sanitize_primitive(value, "enum", enum_values=enum_values)
 
             if schema_type == "object" and "properties" in schema:
                 return self._generate_for_object(schema)

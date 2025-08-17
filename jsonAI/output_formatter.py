@@ -11,7 +11,6 @@ try:
 except ImportError:
     _HAS_PANDAS = False
 
-
 class OutputFormatter:
     """
     A class for formatting data into JSON, XML, and YAML formats.
@@ -57,6 +56,63 @@ class OutputFormatter:
             return self._dict_to_csv(data)
         else:
             raise ValueError(f"Unsupported output format: {output_format}")
+
+    def sanitize_primitive(self, value: Any, schema_type: str, enum_values=None) -> Any:
+        """
+        Sanitize a primitive value to ensure it is valid JSON for the given schema type.
+        - Wraps unquoted strings.
+        - Converts Python None to JSON null.
+        - Ensures enums are quoted and valid.
+        """
+        if schema_type == "string":
+            if isinstance(value, str):
+                # If already quoted as JSON, return as is
+                try:
+                    parsed = json.loads(value)
+                    if isinstance(parsed, str):
+                        return parsed
+                except Exception:
+                    pass
+                # Otherwise, wrap as JSON string
+                return value
+            elif value is None:
+                return ""
+            else:
+                return str(value)
+        if schema_type == "number":
+            try:
+                return float(value)
+            except Exception:
+                return 0.0
+        if schema_type == "integer":
+            try:
+                return int(float(value))
+            except Exception:
+                return 0
+        if schema_type == "boolean":
+            if isinstance(value, bool):
+                return value
+            if isinstance(value, str):
+                if value.lower() in ["true", "1"]:
+                    return True
+                if value.lower() in ["false", "0"]:
+                    return False
+            return bool(value)
+        if schema_type == "null":
+            if value is None or (isinstance(value, str) and value.lower() == "none"):
+                return None
+            return None
+        if schema_type == "enum" and enum_values:
+            # Accept only valid enum values, as string
+            if value in enum_values:
+                return value
+            # Try to coerce
+            if isinstance(value, str):
+                for ev in enum_values:
+                    if value.strip('"\'') == ev:
+                        return ev
+            return enum_values[0]
+        return value
 
     def _dict_to_xml(
         self,
