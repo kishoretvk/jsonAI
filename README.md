@@ -142,11 +142,28 @@ curl -X POST http://localhost:8000/generate/batch -H "Content-Type: application/
 
 ```python
 from jsonAI.main import Jsonformer
-
-# Suppose you have a backend that implements ModelBackend
 from jsonAI.model_backends import DummyBackend
 backend = DummyBackend()  # replace with OllamaBackend/OpenAIBackend/etc.
 
+# Primitive type: string
+schema = {"type": "string"}
+prompt = "Generate a random color name."
+jsonformer = Jsonformer(model_backend=backend, json_schema=schema, prompt=prompt)
+print(jsonformer())  # e.g., "blue"
+
+# Primitive type: number
+schema = {"type": "number"}
+prompt = "Generate a random floating point number."
+jsonformer = Jsonformer(model_backend=backend, json_schema=schema, prompt=prompt)
+print(jsonformer())  # e.g., 3.1415
+
+# Enum type
+schema = {"type": "string", "enum": ["A", "B", "C"]}
+prompt = "Pick a letter from the set A, B, or C."
+jsonformer = Jsonformer(model_backend=backend, json_schema=schema, prompt=prompt)
+print(jsonformer())  # e.g., "B"
+
+# Object type
 schema = {
     "type": "object",
     "properties": {
@@ -571,5 +588,5 @@ For async streaming, adapt the pattern with the async wrapper as needed.
 
 ## Limitations
 
-- Primitive types (`string`, `number`, `integer`, `boolean`, `null`) and `enum` schemas are not yet supported for direct generation by the backend. These test cases are skipped in [examples/test_json_schema_variety.py](examples/test_json_schema_variety.py).
-- See the test file and project roadmap for updates on backend support for these types.
+- All native JSON schema types are now fully supported and tested, including primitives (`string`, `number`, `integer`, `boolean`, `null`), enums, arrays, objects, oneOf, and nested/complex schemas.
+- See [examples/test_json_schema_variety.py](examples/test_json_schema_variety.py) for comprehensive test coverage and usage patterns.
