@@ -99,8 +99,14 @@ class OutputFormatter:
                     return False
             return bool(value)
         if schema_type == "null":
-            if value is None or (isinstance(value, str) and value.lower() == "none"):
+            print(f"[DEBUG] sanitize_primitive: value={repr(value)}, schema_type={schema_type}")
+            if value is None:
                 return None
+            if isinstance(value, str):
+                cleaned = value.strip().strip('"\'').strip().lower()
+                print(f"[DEBUG] cleaned value for null: {repr(cleaned)}")
+                if cleaned == "none" or cleaned == "null":
+                    return None
             return None
         if schema_type == "enum" and enum_values:
             # Accept only valid enum values, as string
