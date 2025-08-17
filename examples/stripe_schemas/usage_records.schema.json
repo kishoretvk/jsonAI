@@ -1,0 +1,28 @@
+{
+  "title": "Stripe Usage Records",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the object."
+    },
+    "quantity": {
+      "type": "integer",
+      "description": "The usage quantity for the specified date."
+    },
+    "timestamp": {
+      "type": "integer",
+      "description": "The timestamp when this usage occurred."
+    },
+    "subscription_item": {
+      "type": "string",
+      "description": "The ID of the subscription item this usage record contains data for."
+    }
+  },
+  "required": [
+    "id",
+    "quantity",
+    "timestamp",
+    "subscription_item"
+  ]
+}

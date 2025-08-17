@@ -1,0 +1,43 @@
+{
+  "title": "Stripe Tax Rates",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the object."
+    },
+    "active": {
+      "type": "boolean",
+      "description": "Defaults to true. When set to false, this tax rate cannot be applied to objects in the API, but will still be applied to subscriptions and invoices that already have it set."
+    },
+    "created": {
+      "type": "integer",
+      "description": "Time at which the object was created. Measured in seconds since the Unix epoch."
+    },
+    "display_name": {
+      "type": "string",
+      "description": "The display name of the tax rates as it will appear to your customer on their receipt email, PDF, and the hosted invoice page."
+    },
+    "inclusive": {
+      "type": "boolean",
+      "description": "This specifies if the tax rate is inclusive or exclusive."
+    },
+    "jurisdiction": {
+      "type": "string",
+      "description": "The jurisdiction for the tax rate."
+    },
+    "percentage": {
+      "type": "number",
+      "description": "This represents the tax rate percent out of 100."
+    }
+  },
+  "required": [
+    "id",
+    "active",
+    "created",
+    "display_name",
+    "inclusive",
+    "jurisdiction",
+    "percentage"
+  ]
+}
