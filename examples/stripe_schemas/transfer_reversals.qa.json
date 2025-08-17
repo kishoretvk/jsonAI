@@ -1,0 +1,5 @@
+{
+  "schema": "transfer_reversals.schema.json",
+  "description": "QA environment config for transfer_reversals schema.",
+  "env": "qa"
+}

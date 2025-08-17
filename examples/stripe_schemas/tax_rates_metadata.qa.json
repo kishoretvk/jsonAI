@@ -1,0 +1,5 @@
+{
+  "schema": "tax_rates_metadata.schema.json",
+  "description": "QA environment config for tax_rates_metadata schema.",
+  "env": "qa"
+}

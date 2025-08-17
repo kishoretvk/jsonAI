@@ -114,7 +114,7 @@ async def get_jsonformer(request: GenerationRequest) -> Union[Jsonformer, Optimi
                 tokenizer: Any
                 if request.model_name.lower() == "ollama":
                     from .model_backends import OllamaBackend, DummyTokenizer
-                    model = OllamaBackend(model_name=request.model_path or "llama3")
+                    model = OllamaBackend(model_name=request.model_path or "mistral:latest")
                     tokenizer = DummyTokenizer()
                 elif request.model_name.lower() == "transformers":
                     # Placeholder: user must provide actual model/tokenizer elsewhere
@@ -228,7 +228,7 @@ async def generate_json_async(request: GenerationRequest):
         if cache_key not in _model_cache:
             if request.model_name.lower() == "ollama":
                 from .model_backends import OllamaBackend, DummyTokenizer
-                model = OllamaBackend(model_name=request.model_path or "llama3")
+                model = OllamaBackend(model_name=request.model_path or "mistral:latest")
                 tokenizer = DummyTokenizer()
             elif request.model_name.lower() == "openai":
                 from .model_backends import OpenAIBackend, DummyTokenizer

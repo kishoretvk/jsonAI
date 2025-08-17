@@ -1,0 +1,39 @@
+{
+  "title": "transfer_reversals",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the object."
+    },
+    "amount": {
+      "type": "integer",
+      "description": "Amount, in cents."
+    },
+    "balance_transaction_id": {
+      "type": "string",
+      "description": "Balance transaction that describes the impact on your account balance."
+    },
+    "created": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Time at which the object was created. Measured in seconds since the Unix epoch."
+    },
+    "currency": {
+      "type": "string",
+      "description": "Three-letter ISO currency code, in lowercase. Must be a supported currency."
+    },
+    "transfer_id": {
+      "type": "string",
+      "description": "ID of the transfer that was reversed."
+    }
+  },
+  "required": [
+    "id",
+    "amount",
+    "balance_transaction_id",
+    "created",
+    "currency",
+    "transfer_id"
+  ]
+}

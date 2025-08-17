@@ -1,0 +1,5 @@
+{
+  "schema": "tax_rates_metadata.schema.json",
+  "description": "Perf environment config for tax_rates_metadata schema.",
+  "env": "perf"
+}

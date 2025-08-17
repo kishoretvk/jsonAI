@@ -115,7 +115,7 @@ curl -X POST http://localhost:8000/generate -H "Content-Type: application/json" 
   "prompt": "Generate a simple user object",
   "schema": {"type":"object","properties":{"name":{"type":"string"},"age":{"type":"integer"}}},
   "model_name": "ollama",
-  "model_path": "llama3"
+  "model_path": "mistral:latest"
 }'
 
 # Async generate
@@ -123,20 +123,46 @@ curl -X POST http://localhost:8000/generate/async -H "Content-Type: application/
   "prompt": "Generate a simple user object",
   "schema": {"type":"object","properties":{"name":{"type":"string"},"age":{"type":"integer"}}},
   "model_name": "ollama",
-  "model_path": "llama3"
+  "model_path": "mistral:latest"
 }'
 
 # Batch generate
 curl -X POST http://localhost:8000/generate/batch -H "Content-Type: application/json" -d '{
   "requests": [
-    {"prompt":"User 1","schema":{"type":"object","properties":{"name":{"type":"string"}}},"model_name":"ollama","model_path":"llama3"},
-    {"prompt":"User 2","schema":{"type":"object","properties":{"name":{"type":"string"}}},"model_name":"ollama","model_path":"llama3"}
+    {"prompt":"User 1","schema":{"type":"object","properties":{"name":{"type":"string"}}},"model_name":"ollama","model_path":"mistral:latest"},
+    {"prompt":"User 2","schema":{"type":"object","properties":{"name":{"type":"string"}}},"model_name":"ollama","model_path":"mistral:latest"}
   ],
   "max_concurrent": 5
 }'
 ```
 
 ## Examples
+
+### Stripe Schema Demo
+
+A full demonstration of environment-based configuration and schema-driven generation is provided in both:
+
+- [`examples/stripe_schemas/stripe_schema_demo.py`](examples/stripe_schemas/stripe_schema_demo.py) (Python script)
+- [`examples/stripe_schemas/stripe_schema_demo.ipynb`](examples/stripe_schemas/stripe_schema_demo.ipynb) (Jupyter notebook)
+
+**Features demonstrated:**
+- Loading Stripe-like schemas and environment-specific config files
+- Switching between multiple schemas (`transfer_reversals_metadata`, `tax_rates_metadata`, `transfer_reversals`) and environments (`dev`, `qa`, `cte`, `perf`, `prod`)
+- Using config file naming conventions: `<schema>.<env>.json` (e.g., `transfer_reversals_metadata.dev.json`)
+- Tool chaining and environment-driven config patterns
+- Integration with Ollama and JsonAI's tool registry
+
+**Usage pattern:**
+```python
+env = "dev"  # or "qa", "cte", "perf", "prod"
+schema_choice = "transfer_reversals_metadata"  # or "tax_rates_metadata", "transfer_reversals"
+config_path = base_dir / f"{schema_choice}.{env}.json"
+```
+
+All required schema and config files are provided in [`examples/stripe_schemas/`](examples/stripe_schemas/).  
+You can run the Python script or the notebook to see how to generate and validate data for any supported schema/environment combination.
+
+See the `examples/stripe_schemas/` directory for all related files and configuration patterns.
 
 ### Basic JSON Generation
 
@@ -229,7 +255,7 @@ python -m jsonAI.cli generate --schema schema.json --prompt "Generate a product"
 ```bash
 python -m jsonAI.cli generate --schema complex_schema.json \
   --prompt "Generate a comprehensive person profile as JSON." \
-  --use-ollama --ollama-model llama3
+  --use-ollama --ollama-model mistral:latest
 ```
 
 #### Features

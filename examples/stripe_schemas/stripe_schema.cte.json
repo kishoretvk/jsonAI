@@ -1,0 +1,5 @@
+{
+  "schema": "transfer_reversals_metadata.schema.json",
+  "description": "CTE environment config for transfer_reversals_metadata schema.",
+  "env": "cte"
+}

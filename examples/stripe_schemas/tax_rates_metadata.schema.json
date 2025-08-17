@@ -1,0 +1,19 @@
+{
+  "title": "tax_rates_metadata",
+  "type": "object",
+  "properties": {
+    "tax_rate_id": {
+      "type": "string",
+      "description": "The ID of the tax_rate that this metadata entry is associated with."
+    },
+    "key": {
+      "type": "string",
+      "description": "Name of the metadata key."
+    },
+    "value": {
+      "type": "string",
+      "description": "Value of the metadata."
+    }
+  },
+  "required": ["tax_rate_id", "key", "value"]
+}

@@ -1,0 +1,5 @@
+{
+  "schema": "transfer_reversals.schema.json",
+  "description": "Perf environment config for transfer_reversals schema.",
+  "env": "perf"
+}
