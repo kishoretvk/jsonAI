@@ -105,7 +105,7 @@ class OutputFormatter:
             if isinstance(value, str):
                 cleaned = value.strip().strip('"\'').strip().lower()
                 print(f"[DEBUG] cleaned value for null: {repr(cleaned)}")
-                if cleaned == "none" or cleaned == "null":
+                if cleaned in ("none", "null"):
                     return None
             return None
         if schema_type == "enum" and enum_values:
