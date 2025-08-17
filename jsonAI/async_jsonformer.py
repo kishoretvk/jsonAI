@@ -85,6 +85,6 @@ class FullAsyncJsonformer:
         return f"{self.prompt}\nOutput JSON:"
 
     async def __call__(self) -> Dict[str, Any]:
-        result = {}
+        result: Dict[str, Any] = {}
         await self.agenerate_object(self.json_schema["properties"], result)
         return result

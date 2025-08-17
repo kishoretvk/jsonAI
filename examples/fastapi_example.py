@@ -11,8 +11,8 @@ from jsonAI.main import Jsonformer
 # In a real application, you might load a larger model
 model_name = "gpt2"
 # Using gpt2 as a small example model
-model = AutoModelForCausalLM.from_pretrained(model_name)
-tokenizer = AutoTokenizer.from_pretrained(model_name)
+model: AutoModelForCausalLM = AutoModelForCausalLM.from_pretrained(model_name)
+tokenizer: AutoTokenizer = AutoTokenizer.from_pretrained(model_name)
 
 
 app = FastAPI()
@@ -45,15 +45,17 @@ async def generate_structured_data(request: GenerateRequest):
         print("Using default schema:", request.json_schema)
 
     try:
+        # Use backend as required by Jsonformer in main codebase
+        from jsonAI.model_backends import HuggingfaceBackend
+        backend = HuggingfaceBackend(model=model, tokenizer=tokenizer)
         jsonformer_instance = Jsonformer(
-            model=model,
-            tokenizer=tokenizer,
-            json_schema=request.json_schema,
+            backend,
+            request.json_schema,
             prompt=request.prompt,
             output_format=request.output_format,
             validate_output=request.validate_output,
         )
-        generated_data = jsonformer_instance()
+        generated_data = jsonformer_instance.generate_data()
 
         # FastAPI handles JSON (dict/list) automatically.
         if request.output_format == "json":

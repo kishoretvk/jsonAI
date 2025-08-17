@@ -67,7 +67,7 @@ class Jsonformer:
         self.generation_marker = "|GENERATION|"
         self.max_array_length = max_array_length
 
-        if self.tool_registry is not None and callable(getattr(self.tool_registry, "get_tool", None)):
+        if self.tool_registry is not None and hasattr(self.tool_registry, "get_tool") and callable(getattr(self.tool_registry, "get_tool", None)):
             self.debug("[__init__] tool_registry.get_tool type", str(type(self.tool_registry.get_tool)))
             self.debug("[__init__] tool_registry.get_tool value", str(self.tool_registry.get_tool))
         self.debug("[__init__] mcp_callback type", str(type(self.mcp_callback)))
@@ -495,14 +495,14 @@ Result: ```json
                     return parsed
             return generated_data
         except Exception as e:
-            candidates: List[str] = []
+            extra_candidates: List[str] = []
             if hasattr(self, 'last_output') and self.last_output:
-                candidates.append(self.last_output)
+                extra_candidates.append(self.last_output)
             if hasattr(e, 'args') and e.args:
                 for arg in e.args:
                     if isinstance(arg, str):
-                        candidates.append(arg)
-            for source in candidates:
+                        extra_candidates.append(arg)
+            for source in extra_candidates:
                 json_candidates = extract_json_candidates(source)
                 for candidate in json_candidates:
                     parsed = try_parse_json(candidate)
@@ -533,7 +533,9 @@ class AsyncJsonformer:
 
         # Execute tool asynchronously
         tool_name = tool_call_config.get("name")
-        tool = self.jsonformer.tool_registry.get_tool(tool_name)
+        tool = None
+        if hasattr(self.jsonformer.tool_registry, "get_tool") and callable(getattr(self.jsonformer.tool_registry, "get_tool", None)):
+            tool = self.jsonformer.tool_registry.get_tool(tool_name)
         if not tool:
             raise ValueError(f"Tool '{tool_name}' not found in registry")
 

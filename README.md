@@ -568,3 +568,8 @@ for data_chunk in jsonformer.stream_generate_data():
 ```
 
 For async streaming, adapt the pattern with the async wrapper as needed.
+
+## Limitations
+
+- Primitive types (`string`, `number`, `integer`, `boolean`, `null`) and `enum` schemas are not yet supported for direct generation by the backend. These test cases are skipped in [examples/test_json_schema_variety.py](examples/test_json_schema_variety.py).
+- See the test file and project roadmap for updates on backend support for these types.

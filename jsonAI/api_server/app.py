@@ -60,7 +60,7 @@ if OBS_ENABLE_TRACING:
     otlp_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "").strip()
     service_name = os.getenv("OTEL_SERVICE_NAME", "generativejson-api")
     headers_str = os.getenv("OTEL_EXPORTER_OTLP_HEADERS", "")
-    otlp_headers = None
+    otlp_headers: dict[str, str] | None = None
     if headers_str:
         # Convert "k=v,k2=v2" -> dict
         parts = [p for p in headers_str.split(",") if p]
@@ -77,7 +77,7 @@ if OBS_ENABLE_TRACING:
     })
     tracer_provider = TracerProvider(resource=resource)
     if otlp_endpoint:
-        span_exporter = OTLPHTTPSpanExporter(endpoint=f"{otlp_endpoint}/v1/traces", headers=otlp_headers)
+        span_exporter: OTLPHTTPSpanExporter = OTLPHTTPSpanExporter(endpoint=f"{otlp_endpoint}/v1/traces", headers=otlp_headers)
         tracer_provider.add_span_processor(BatchSpanProcessor(span_exporter))
     trace.set_tracer_provider(tracer_provider)
 
