@@ -420,9 +420,13 @@ Result: ```json
                 return faker.word()
             return ''.join(random.choices('abcdefghijklmnopqrstuvwxyz', k=8))
         if stype == "number":
-            return round(random.uniform(1, 1000), 2)
+            min_val = schema.get("minimum", 1)
+            max_val = schema.get("maximum", 1000)
+            return round(random.uniform(min_val, max_val), 2)
         if stype == "integer":
-            return random.randint(1, 1000)
+            min_val = schema.get("minimum", 1)
+            max_val = schema.get("maximum", 1000)
+            return random.randint(min_val, max_val)
         if stype == "boolean":
             return random.choice([True, False])
         if stype == "null":
