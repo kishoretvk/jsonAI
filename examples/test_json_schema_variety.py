@@ -88,9 +88,9 @@ def extract_and_parse_json_from_sources(sources, required_keys=None):
 def test_json_schema_variety(json_schema, required_keys, desc):
     # Skip unsupported types for now
     # TODO: Backend does not support primitive types or enums yet. See README "Limitations".
-    unsupported = ["string", "number", "integer", "boolean", "null"]
-    if json_schema.get("type") in unsupported or "enum" in json_schema:
-        pytest.skip(f"Schema type {json_schema.get('type')} or enum not yet supported by backend. See README 'Limitations'.")
+    # unsupported = ["string", "number", "integer", "boolean", "null"]
+    # if json_schema.get("type") in unsupported or "enum" in json_schema:
+    #     pytest.skip(f"Schema type {json_schema.get('type')} or enum not yet supported by backend. See README 'Limitations'.")
 
     model_name = os.environ.get("OLLAMA_MODEL", "qwen3:0.6b")
     try:
