@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "jsonAI"
-version = "0.15.2.3"  # Patch bump for PyPI republish; previous versions exist on PyPI
+version = "0.15.2.4"  # Patch bump for PyPI republish; previous versions exist on PyPI
 description = "A Python library for dynamic JSON generation based on schemas using language models."
 authors = ["1rgs <kishoretvk9@gmail.com>"]
 license = "MIT"
