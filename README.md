@@ -1,5 +1,9 @@
 # JsonAI — Production-Ready Structured JSON Generation with LLMs
 
+## Environment Configuration
+
+This project uses separate environment files for dev, qa, perf, cte, and prod, each located at the project root as `.env.dev`, `.env.qa`, `.env.perf`, `.env.cte`, and `.env.prod`. These files contain environment-specific variables for OIDC, metrics, tracing, and service endpoints. All files use the same variable structure for consistency and ease of deployment. See the `examples/stripe_schemas/` directory for environment-specific schema configs.
+
 JsonAI is a comprehensive Python library for generating structured JSON data using Large Language Models (LLMs). It provides enterprise-grade features including robust JSON schema validation, multiple model backends, REST API, React frontend, CLI interface, and production deployment configurations.
 
 Current version: 0.15.1
