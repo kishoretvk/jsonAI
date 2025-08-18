@@ -121,28 +121,18 @@ class OpenAIBackend(ModelBackend):
 
     def generate(self, prompt: str, **kwargs) -> str:
         try:
-            # Support both openai.ChatCompletion and openai.Completion for compatibility
-            if hasattr(self.openai, "ChatCompletion"):
-                response = self.openai.ChatCompletion.create(
-                    model=kwargs.get("model", "gpt-3.5-turbo"),
-                    messages=[{"role": "system", "content": "You are a helpful assistant."},
-                              {"role": "user", "content": prompt}],
-                    max_tokens=kwargs.get("max_tokens", 100),
-                    temperature=kwargs.get("temperature", 0.7),
-                    api_key=self.api_key
-                )
-                return response.choices[0].message["content"].strip()
-            elif hasattr(self.openai, "Completion"):
-                response = self.openai.Completion.create(
-                    model=kwargs.get("model", "text-davinci-003"),
-                    prompt=prompt,
-                    max_tokens=kwargs.get("max_tokens", 100),
-                    temperature=kwargs.get("temperature", 0.7),
-                    api_key=self.api_key
-                )
-                return response.choices[0].text.strip()
-            else:
-                raise AttributeError("OpenAI module has no ChatCompletion or Completion attribute")
+            # Always use OpenAI client for openai>=1.0.0
+            client = self.openai.OpenAI(api_key=self.api_key)
+            response = client.chat.completions.create(
+                model=kwargs.get("model", "gpt-3.5-turbo"),
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=kwargs.get("max_tokens", 100),
+                temperature=kwargs.get("temperature", 0.7)
+            )
+            return response.choices[0].message.content.strip()
         except Exception as e:
             raise ValueError(f"Failed to generate text with OpenAI: {e}")
 
