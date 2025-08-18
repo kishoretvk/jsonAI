@@ -3,7 +3,7 @@ import xml.etree.ElementTree as ET
 import yaml
 import csv
 from collections import OrderedDict
-from typing import Any
+from typing import Any, Union
 
 try:
     import pandas as pd
@@ -18,11 +18,11 @@ class OutputFormatter:
 
     def format(
         self,
-        data: dict[str, Any] | list[dict[str, Any]],
+        data: Union[dict[str, Any], list[dict[str, Any]]],
         output_format: str = 'json',
         root_element: str = 'root',
-        root_attributes: dict[str, Any] | None = None,
-        schema: dict[str, Any] | None = None,
+        root_attributes: Union[dict[str, Any], None] = None,
+        schema: Union[dict[str, Any], None] = None,
     ) -> str:
         """
         Format data into the specified output format, with optional schema-driven validation.
@@ -118,7 +118,7 @@ class OutputFormatter:
         self,
         data: dict[str, Any],
         root_element: str = 'root',
-        root_attributes: dict[str, Any] | None = None
+        root_attributes: Union[dict[str, Any], None] = None
     ) -> str:
         """
         Convert a dictionary to an XML string.
@@ -166,7 +166,7 @@ class OutputFormatter:
         else:
             raise TypeError(f"Unsupported data type: {type(data)}")
 
-    def _dict_to_csv(self, data: dict[str, Any] | list[dict[str, Any]], schema: dict[str, Any] | None = None) -> str:
+    def _dict_to_csv(self, data: Union[dict[str, Any], list[dict[str, Any]]], schema: Union[dict[str, Any], None] = None) -> str:
         """
         Convert a dictionary or list of dicts to a CSV string.
         Uses pandas if available for tabular data.

@@ -342,6 +342,43 @@ Result: ```json
         field = schema.get("title") or schema.get("name")
         stype = schema.get("type")
         fmt = schema.get("format")
+        if self._apply_fallback_hooks(schema, field, stype, fmt):
+            return self._apply_fallback_hooks(schema, field, stype, fmt)
+
+        if self._prob_choice_tree_fallback(schema, stype):
+            return self._prob_choice_tree_fallback(schema, stype)
+
+        if "default" in schema:
+            return schema["default"]
+
+        if "enum" in schema and isinstance(schema["enum"], list) and schema["enum"]:
+            return random.choice(schema["enum"])
+
+        if stype == "string":
+            return self._faker_string_fallback(fmt, faker)
+        if stype == "number":
+            min_val = schema.get("minimum", 1)
+            max_val = schema.get("maximum", 1000)
+            return round(random.uniform(min_val, max_val), 2)
+        if stype == "integer":
+            min_val = schema.get("minimum", 1)
+            max_val = schema.get("maximum", 1000)
+            return random.randint(min_val, max_val)
+        if stype == "boolean":
+            return random.choice([True, False])
+        if stype == "null":
+            return None
+        if stype == "array":
+            items = schema.get("items", {})
+            arr_len = random.randint(schema.get("minItems", 1), schema.get("maxItems", 3) if "maxItems" in schema else 3)
+            return [self._deterministic_value_for_schema(items) for _ in range(arr_len)]
+        if stype == "object":
+            return self._deterministic_object(schema)
+        if "oneOf" in schema and isinstance(schema["oneOf"], list) and schema["oneOf"]:
+            return self._deterministic_value_for_schema(schema["oneOf"][0])
+        return "example"
+
+    def _apply_fallback_hooks(self, schema, field, stype, fmt):
         # Field-specific hook
         if field and field in self.fallback_hooks:
             hook_result = self.fallback_hooks[field](schema)
@@ -357,8 +394,9 @@ Result: ```json
             hook_result = self.fallback_hooks[f"format:{fmt}"](schema)
             if hook_result is not None:
                 return hook_result
+        return None
 
-        # Try prob_choice_tree fallback if model/tokenizer available
+    def _prob_choice_tree_fallback(self, schema, stype):
         try:
             from jsonAI.prob_choice_tree import prob_choice_tree
             from jsonAI.type_prefixes import TypePrefixIdentifier
@@ -393,60 +431,35 @@ Result: ```json
                         return results[0]["choice"]
         except Exception:
             pass
+        return None
 
-        # Use schema default if present
-        if "default" in schema:
-            return schema["default"]
+    def _faker_string_fallback(self, fmt, faker):
+        if fmt == "email" and faker:
+            return faker.email()
+        if fmt == "date" and faker:
+            return faker.date()
+        if fmt == "date-time" and faker:
+            return faker.iso8601()
+        if fmt == "uuid" and faker:
+            return faker.uuid4()
+        if fmt == "ipv4" and faker:
+            return faker.ipv4()
+        if fmt == "ipv6" and faker:
+            return faker.ipv6()
+        if faker:
+            return faker.word()
+        import random
+        return ''.join(random.choices('abcdefghijklmnopqrstuvwxyz', k=8))
 
-        # Enum takes priority, random choice for fallback
-        if "enum" in schema and isinstance(schema["enum"], list) and schema["enum"]:
-            return random.choice(schema["enum"])
-
-        # Faker/format-aware fallback for strings
-        if stype == "string":
-            if fmt == "email" and faker:
-                return faker.email()
-            if fmt == "date" and faker:
-                return faker.date()
-            if fmt == "date-time" and faker:
-                return faker.iso8601()
-            if fmt == "uuid" and faker:
-                return faker.uuid4()
-            if fmt == "ipv4" and faker:
-                return faker.ipv4()
-            if fmt == "ipv6" and faker:
-                return faker.ipv6()
-            if faker:
-                return faker.word()
-            return ''.join(random.choices('abcdefghijklmnopqrstuvwxyz', k=8))
-        if stype == "number":
-            min_val = schema.get("minimum", 1)
-            max_val = schema.get("maximum", 1000)
-            return round(random.uniform(min_val, max_val), 2)
-        if stype == "integer":
-            min_val = schema.get("minimum", 1)
-            max_val = schema.get("maximum", 1000)
-            return random.randint(min_val, max_val)
-        if stype == "boolean":
-            return random.choice([True, False])
-        if stype == "null":
-            return None
-        if stype == "array":
-            items = schema.get("items", {})
-            arr_len = random.randint(schema.get("minItems", 1), schema.get("maxItems", 3) if "maxItems" in schema else 3)
-            return [self._deterministic_value_for_schema(items) for _ in range(arr_len)]
-        if stype == "object":
-            result: Dict[str, Any] = {}
-            props: Dict[str, Any] = schema.get("properties", {}) or {}
-            required = schema.get("required", []) or []
-            keys = list(dict.fromkeys([*required, *props.keys()]))  # preserve order, remove dups
-            for key in keys:
-                child_schema = props.get(key, {"type": "string"})
-                result[key] = self._deterministic_value_for_schema(child_schema)
-            return result
-        if "oneOf" in schema and isinstance(schema["oneOf"], list) and schema["oneOf"]:
-            return self._deterministic_value_for_schema(schema["oneOf"][0])
-        return "example"
+    def _deterministic_object(self, schema):
+        result: Dict[str, Any] = {}
+        props: Dict[str, Any] = schema.get("properties", {}) or {}
+        required = schema.get("required", []) or []
+        keys = list(dict.fromkeys([*required, *props.keys()]))  # preserve order, remove dups
+        for key in keys:
+            child_schema = props.get(key, {"type": "string"})
+            result[key] = self._deterministic_value_for_schema(child_schema)
+        return result
 
     def _generate_for_object(self, schema: Dict[str, Any]) -> Dict[str, Any]:
         """Generate data for object schemas. Prefer parsed backend output; fallback to deterministic synthesis."""
