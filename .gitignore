@@ -3,3 +3,11 @@ __pycache__/
 workspace.ipynb
 dist
 .DS_Store
+
+# Ignore environment and config files
+.env.*
+# Ignore coverage files
+.coverage
+coverage.xml
+# Ignore Jupyter notebooks
+*.ipynb
