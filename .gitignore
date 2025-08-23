@@ -11,3 +11,9 @@ dist
 coverage.xml
 # Ignore Jupyter notebooks
 *.ipynb
+
+# Ignore package artifacts
+*.pypl
+*.pacakge
+*.pypi
+*.package
