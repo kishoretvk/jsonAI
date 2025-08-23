@@ -8,7 +8,7 @@ JsonAI is a comprehensive Python library for generating structured JSON data usi
 
 Current version: 0.15.1
 
-## 🔔 What’s New in 0.15.1
+## 🔔 What's New in 0.15.1
 
 - Stabilized FastAPI REST API with endpoints for sync/async generation, batch processing, stats, cache management, and schema validation
 - Performance suite:
@@ -55,6 +55,56 @@ All values are well below the recommended threshold (KL < 0.5), demonstrating hi
 - Performance Monitoring: Built-in metrics via PerformanceMonitor
 - Schema Validation: Comprehensive validation with jsonschema
 - Multiple Output Formats: JSON, YAML, XML, and CSV
+
+## 🦙 Ollama Integration
+
+JsonAI provides comprehensive integration with Ollama, enabling local LLM-powered structured data generation. The integration includes:
+
+### Features
+- **Enhanced Ollama Backend**: Robust error handling, retry mechanisms, and support for all Ollama options
+- **Model Selection & Tuning**: Automatic model selection based on task type and performance tuning
+- **Agentic Testing Ecosystem**: Full support for workflow orchestration, state management, and tracing
+- **Performance Optimization**: Configurable parameters for optimal generation quality and speed
+
+### Usage
+```
+from jsonAI.model_backends import OllamaBackend
+from jsonAI.main import Jsonformer
+
+# Create Ollama backend
+backend = OllamaBackend(model_name="mistral", max_retries=3)
+
+# Define schema and prompt
+schema = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "age": {"type": "integer"}
+    }
+}
+prompt = "Generate a person profile"
+
+# Create Jsonformer with Ollama
+jsonformer = Jsonformer(
+    model_backend=backend,
+    json_schema=schema,
+    prompt=prompt,
+    ollama_options={"temperature": 0.7}
+)
+
+# Generate data
+result = jsonformer.generate_data()
+```
+
+### Advanced Agentic Workflows
+JsonAI supports complex agentic workflows with Ollama:
+- Workflow orchestration with conditional execution
+- State management with session isolation
+- Persistent storage for workflow execution tracking
+- Distributed tracing for observability
+- MCP protocol support for tool integration
+
+See `examples/ollama_integration_example.py` for detailed usage examples.
 
 ## 📦 Installation
 
@@ -197,7 +247,7 @@ See the `examples/stripe_schemas/` directory for all related files and configura
 
 ### Basic JSON Generation
 
-```python
+```
 from jsonAI.main import Jsonformer
 from jsonAI.model_backends import DummyBackend
 backend = DummyBackend()  # replace with OllamaBackend/OpenAIBackend/etc.
@@ -239,7 +289,7 @@ print(output)
 ### XML Output
 ### YAML Output
 
-```python
+```
 schema = {
     "type": "object",
     "properties": {
@@ -255,7 +305,7 @@ print(output)
 
 ### CSV Output
 
-```python
+```
 schema = {
     "type": "array",
     "items": {
@@ -277,13 +327,13 @@ print(output)
 
 #### Basic CLI Usage
 
-```bash
+```
 python -m jsonAI.cli generate --schema schema.json --prompt "Generate a product" --output-format json
 ```
 
 #### Using Ollama Backend (Recommended for LLMs)
 
-```bash
+```
 python -m jsonAI.cli generate --schema complex_schema.json \
   --prompt "Generate a comprehensive person profile as JSON." \
   --use-ollama --ollama-model mistral:latest
@@ -298,7 +348,7 @@ python -m jsonAI.cli generate --schema complex_schema.json \
 
 #### Example Output
 
-```json
+```
 {
   "id": "profile with all supported JSON schema types.",
   "name": "re",
@@ -323,7 +373,7 @@ See `complex_schema.json` for a comprehensive schema example.
 
 ### Tool Calling Example
 
-```python
+```
 def send_email(email):
     print(f"Sending email to {email}")
     return "Email sent"
@@ -349,7 +399,7 @@ print(output)
 
 ### MCP Integration Example
 
-```python
+```
 def mcp_callback(tool_name, server_name, kwargs):
     # Simulate MCP call
     return f"Called {tool_name} on {server_name} with {kwargs}"
@@ -371,7 +421,7 @@ print(output)
 
 ### Complex Schema Example
 
-```python
+```
 schema = {
     "type": "object",
     "properties": {
@@ -430,7 +480,7 @@ print(output)
 
 You can chain multiple tools together using the `x-jsonai-tool-chain` schema key. Each tool in the chain receives arguments from the generated data and/or previous tool outputs.
 
-```python
+```
 from jsonAI.main import Jsonformer
 from jsonAI.tool_registry import ToolRegistry
 
@@ -504,7 +554,7 @@ All values are well below the recommended threshold (KL < 0.5), demonstrating hi
 
 Example:
 
-```python
+```
 from jsonAI.performance import OptimizedJsonformer
 from jsonAI.model_backends import DummyBackend
 
@@ -531,7 +581,7 @@ print(jsonformer.generate_batch(requests))
 ```
 
 To inspect performance and cache stats at runtime, use the REST API `GET /stats` or:
-```python
+```
 jsonformer.get_comprehensive_stats()
 ```
 
@@ -648,7 +698,7 @@ Automate in CI by bumping on tags and using repository secrets for tokens.
 
 JsonAI supports streaming data generation (experimental API in examples). Example pattern:
 
-```python
+```
 jsonformer = Jsonformer(model_backend, json_schema, prompt)
 for data_chunk in jsonformer.stream_generate_data():
     print(data_chunk)

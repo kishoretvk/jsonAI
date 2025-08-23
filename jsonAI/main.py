@@ -10,6 +10,7 @@ from jsonAI.output_formatter import OutputFormatter
 from jsonAI.schema_validator import SchemaValidator
 from jsonAI.tool_registry import ToolRegistry
 from jsonAI.async_tool_executor import AsyncToolExecutor, ToolExecutionError
+from jsonAI.workflow_orchestrator import WorkflowOrchestrator, WorkflowStep, WorkflowStepType
 
 
 GENERATION_MARKER = "|GENERATION|"
@@ -44,6 +45,9 @@ class Jsonformer:
         fallback_order: Optional[List[str]] = None,
         llm_retries: int = 1,
         fallback_hooks: Optional[Dict[str, Callable[[Dict[str, Any]], Any]]] = None,
+        workflow_config: Optional[Dict[str, Any]] = None,  # New parameter for workflow configuration
+        # Ollama-specific parameters
+        ollama_options: Optional[Dict[str, Any]] = None,  # Ollama-specific options
     ):
         self.model_backend = model_backend
         self.json_schema = json_schema
@@ -57,6 +61,15 @@ class Jsonformer:
         self.fallback_order = fallback_order or ["llm", "deterministic", "random"]
         self.llm_retries = llm_retries
         self.fallback_hooks = fallback_hooks or {}
+        
+        # Workflow configuration support
+        self.workflow_config = workflow_config
+        self.workflow_orchestrator = None
+        if workflow_config:
+            self._initialize_workflow_orchestrator()
+
+        # Ollama-specific configurations
+        self.ollama_options = ollama_options or {}
 
         self.debug("[__init__] Initialized tool_registry", str(self.tool_registry))
         self.debug("[__init__] Initialized mcp_callback", str(self.mcp_callback))
@@ -80,6 +93,33 @@ class Jsonformer:
         self.debug("[__init__] mcp_callback type", str(type(self.mcp_callback)))
         self.debug("[__init__] mcp_callback value", str(self.mcp_callback))
 
+    def _initialize_workflow_orchestrator(self):
+        """Initialize the workflow orchestrator with the provided configuration."""
+        if not self.workflow_config:
+            return
+            
+        self.workflow_orchestrator = WorkflowOrchestrator(debug=self.debug_on)
+        
+        # Convert workflow configuration to steps
+        steps_config = self.workflow_config.get("steps", [])
+        steps = []
+        
+        for step_config in steps_config:
+            step = WorkflowStep(
+                id=step_config.get("id", ""),
+                name=step_config.get("name", ""),
+                type=WorkflowStepType(step_config.get("type", "generation")),
+                config=step_config.get("config", {}),
+                dependencies=step_config.get("dependencies", []),
+                condition=step_config.get("condition"),
+                on_success=step_config.get("on_success"),
+                on_failure=step_config.get("on_failure"),
+                max_retries=step_config.get("max_retries", 3)
+            )
+            steps.append(step)
+            
+        self.workflow_orchestrator.define_workflow(steps)
+        
     def debug(self, caller: str, value: str, is_prompt: bool = False) -> None:
         if self.debug_on:
             if is_prompt:
@@ -192,7 +232,7 @@ class Jsonformer:
     def get_prompt(self) -> str:
         template = """{prompt}
 Output result in the following JSON schema format:
-```json{schema}```
+``json{schema}```
 Result: ```json
 {progress}"""
         value = self.value
@@ -324,7 +364,11 @@ Result: ```json
         """Try to call backend.generate(prompt) safely and return raw string, else None."""
         if hasattr(self.model_backend, 'generate'):
             try:
-                return self.model_backend.generate(self.prompt)
+                # Pass Ollama-specific options if using Ollama backend
+                if hasattr(self.model_backend, 'structured') and self.model_backend.structured:
+                    return self.model_backend.generate(self.prompt, **self.ollama_options)
+                else:
+                    return self.model_backend.generate(self.prompt)
             except Exception as e:
                 self.debug("[_safe_backend_generate] Backend generate failed", str(e))
         return None
@@ -608,6 +652,19 @@ Result: ```json
 
         raise RuntimeError("All generation strategies failed") from last_exception
 
+    async def execute_workflow(self) -> Any:
+        """Execute the configured workflow."""
+        if not self.workflow_orchestrator:
+            raise ValueError("No workflow configuration provided")
+            
+        # Set initial context variables
+        if hasattr(self.workflow_orchestrator, 'context'):
+            self.workflow_orchestrator.context.variables["prompt"] = self.prompt
+            self.workflow_orchestrator.context.variables["schema"] = self.json_schema
+            
+        result = await self.workflow_orchestrator.execute()
+        return result.output
+        
     def generate(self, prompt: str, **kwargs: Any) -> Any:
         """Compatibility method for subclasses expecting a generate method."""
         return self.generate_data()

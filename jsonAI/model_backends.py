@@ -1,5 +1,4 @@
-
-
+import asyncio
 
 from abc import ABC, abstractmethod
 from transformers import PreTrainedModel
@@ -7,7 +6,6 @@ try:
     from transformers import PreTrainedTokenizer
 except ImportError:
     PreTrainedTokenizer = None  # type: ignore
-import asyncio
 
 class ModelBackend(ABC):
     @abstractmethod
@@ -46,9 +44,10 @@ class TransformersBackend(ModelBackend):
 
 
 class OllamaBackend(ModelBackend):
-    def __init__(self, model_name: str, host: str = "http://localhost:11434"):
+    def __init__(self, model_name: str, host: str = "http://localhost:11434", max_retries: int = 3):
         self.model_name = model_name
         self.host = host
+        self.max_retries = max_retries  # Ollama-specific retry mechanism
         self.structured = True  # Mark as structured for integration test
         try:
             import ollama
@@ -62,54 +61,108 @@ class OllamaBackend(ModelBackend):
             raise ImportError("Ollama is not installed. Please install it with `pip install ollama`")
 
     def generate(self, prompt: str, **kwargs) -> str:
-        # Always use the real Ollama call for integration tests, for any schema type
-        options = None
-        if hasattr(self, "_OllamaOptions") and self._OllamaOptions is not None and kwargs:
+        """Generate text with enhanced error handling and retry mechanism."""
+        last_exception = None
+        
+        # Extract retry-specific parameters
+        max_retries = kwargs.pop('max_retries', self.max_retries)
+        retry_delay = kwargs.get('retry_delay', 1.0)  # seconds
+        
+        for attempt in range(max_retries + 1):
             try:
-                options = self._OllamaOptions(**kwargs)
-            except Exception:
+                # Always use the real Ollama call for integration tests, for any schema type
                 options = None
-        response = self.client.generate(model=self.model_name, prompt=prompt, stream=False, options=options)
-        # Handle Mapping or Iterator response
-        if isinstance(response, dict) and 'response' in response:
-            return response['response']
-        elif hasattr(response, '__iter__'):
-            # If it's an iterator, get the first item with 'response'
-            for item in response:
-                if isinstance(item, dict) and 'response' in item:
-                    return item['response']
-            raise ValueError("No 'response' found in Ollama response iterator")
-        else:
-            raise TypeError("Unexpected Ollama response type")
+                if hasattr(self, "_OllamaOptions") and self._OllamaOptions is not None and kwargs:
+                    try:
+                        options = self._OllamaOptions(**kwargs)
+                    except Exception:
+                        options = None
+                        
+                response = self.client.generate(model=self.model_name, prompt=prompt, stream=False, options=options)
+                
+                # Handle the new Ollama response format (GenerateResponse object)
+                if hasattr(response, 'response'):
+                    return response.response
+                elif isinstance(response, dict) and 'response' in response:
+                    return response['response']
+                elif hasattr(response, '__iter__'):
+                    # If it's an iterator, get the first item with 'response'
+                    for item in response:
+                        if hasattr(item, 'response'):
+                            return item.response
+                        elif isinstance(item, dict) and 'response' in item:
+                            return item['response']
+                    raise ValueError("No 'response' found in Ollama response")
+                else:
+                    # Try to convert to string as fallback
+                    return str(response)
+                    
+            except Exception as e:
+                last_exception = e
+                if attempt < max_retries:
+                    import time
+                    time.sleep(retry_delay * (2 ** attempt))  # Exponential backoff
+                    continue
+                else:
+                    # If this is the last attempt, raise the exception
+                    raise ValueError(f"Ollama generation failed after {max_retries + 1} attempts: {e}") from e
+                    
+        # This should never be reached, but just in case
+        raise ValueError(f"Ollama generation failed after {max_retries + 1} attempts: {last_exception}")
 
     async def agenerate(self, prompt: str, **kwargs) -> str:
-        """Async implementation for Ollama with error handling."""
-        try:
-            import ollama
-            options = None
-            if hasattr(self, "_OllamaOptions") and self._OllamaOptions is not None and kwargs:
-                try:
-                    options = self._OllamaOptions(**kwargs)
-                except Exception:
-                    options = None
-            response = await ollama.AsyncClient(host=self.host).generate(
-                model=self.model_name, 
-                prompt=prompt, 
-                stream=False, 
-                options=options
-            )
-            if isinstance(response, dict) and 'response' in response:
-                return response['response']
-            elif hasattr(response, '__aiter__'):
-                async for item in response:
-                    if isinstance(item, dict) and 'response' in item:
-                        return item['response']
-                raise ValueError("No 'response' found in Ollama async response iterator")
-            else:
-                raise TypeError("Unexpected Ollama async response type")
-        except Exception as e:
-            raise ValueError(f"Failed to generate text asynchronously: {e}")
-
+        """Async implementation for Ollama with enhanced error handling and retry mechanism."""
+        last_exception = None
+        
+        # Extract retry-specific parameters
+        max_retries = kwargs.pop('max_retries', self.max_retries)
+        retry_delay = kwargs.get('retry_delay', 1.0)  # seconds
+        
+        for attempt in range(max_retries + 1):
+            try:
+                import ollama
+                options = None
+                if hasattr(self, "_OllamaOptions") and self._OllamaOptions is not None and kwargs:
+                    try:
+                        options = self._OllamaOptions(**kwargs)
+                    except Exception:
+                        options = None
+                response = await ollama.AsyncClient(host=self.host).generate(
+                    model=self.model_name, 
+                    prompt=prompt, 
+                    stream=False, 
+                    options=options
+                )
+                
+                # Handle the new Ollama response format (GenerateResponse object)
+                if hasattr(response, 'response'):
+                    return response.response
+                elif isinstance(response, dict) and 'response' in response:
+                    return response['response']
+                elif hasattr(response, '__aiter__'):
+                    # If it's an async iterator, get the first item with 'response'
+                    async for item in response:
+                        if hasattr(item, 'response'):
+                            return item.response
+                        elif isinstance(item, dict) and 'response' in item:
+                            return item['response']
+                    raise ValueError("No 'response' found in Ollama async response")
+                else:
+                    # Try to convert to string as fallback
+                    return str(response)
+                    
+            except Exception as e:
+                last_exception = e
+                if attempt < max_retries:
+                    import asyncio
+                    await asyncio.sleep(retry_delay * (2 ** attempt))  # Exponential backoff
+                    continue
+                else:
+                    # If this is the last attempt, raise the exception
+                    raise ValueError(f"Ollama async generation failed after {max_retries + 1} attempts: {e}") from e
+                    
+        # This should never be reached, but just in case
+        raise ValueError(f"Ollama async generation failed after {max_retries + 1} attempts: {last_exception}")
 class OpenAIBackend(ModelBackend):
     def __init__(self, api_key: str):
         self.api_key = api_key

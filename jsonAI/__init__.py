@@ -20,6 +20,7 @@ from .tool_registry import ToolRegistry
 from .schema_generator import SchemaGenerator
 from .async_jsonformer import AsyncJsonformer, FullAsyncJsonformer
 from .model_backends import ModelBackend, TransformersBackend, OllamaBackend, OpenAIBackend, DummyBackend
+from .ollama_utils import OllamaModelSelector, OllamaPerformanceTuner
 
 __all__ = [
     "Jsonformer",
@@ -35,4 +36,6 @@ __all__ = [
     "OllamaBackend",
     "OpenAIBackend",
     "DummyBackend",
+    "OllamaModelSelector",
+    "OllamaPerformanceTuner"
 ]
