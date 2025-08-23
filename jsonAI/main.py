@@ -338,10 +338,15 @@ Result: ```json
         except ImportError:
             faker = None
 
-        # User-defined fallback hooks (by field or type)
+        # --- EGC and validation integration ---
+        from jsonAI.entity_generation import EntityGenerationRegistry
+        from jsonAI.validation_rules import ValidationRuleRegistry
+
         field = schema.get("title") or schema.get("name")
         stype = schema.get("type")
         fmt = schema.get("format")
+
+        # User-defined fallback hooks (by field or type)
         if self._apply_fallback_hooks(schema, field, stype, fmt):
             return self._apply_fallback_hooks(schema, field, stype, fmt)
 
@@ -354,7 +359,23 @@ Result: ```json
         if "enum" in schema and isinstance(schema["enum"], list) and schema["enum"]:
             return random.choice(schema["enum"])
 
+        # Use EGC and validation for known types/formats
         if stype == "string":
+            # Prefer EGC for known entity types (by format or field name)
+            egc_key = fmt or (field if field in EntityGenerationRegistry.all_configs() else None)
+            egc = EntityGenerationRegistry.get(egc_key) if egc_key else None
+            rule = ValidationRuleRegistry.get(egc_key) if egc_key else None
+            max_attempts = 5
+            for _ in range(max_attempts):
+                if egc:
+                    value = egc.generate()
+                    if not rule or rule.validate(value):
+                        return value
+                else:
+                    value = self._faker_string_fallback(fmt, faker)
+                    if not rule or rule.validate(value):
+                        return value
+            # If all attempts fail, fallback to faker or example
             return self._faker_string_fallback(fmt, faker)
         if stype == "number":
             min_val = schema.get("minimum", 1)
@@ -370,7 +391,10 @@ Result: ```json
             return None
         if stype == "array":
             items = schema.get("items", {})
-            arr_len = random.randint(schema.get("minItems", 1), schema.get("maxItems", 3) if "maxItems" in schema else 3)
+            arr_len = random.randint(
+                schema.get("minItems", 1),
+                schema.get("maxItems", 3) if "maxItems" in schema else 3
+            )
             return [self._deterministic_value_for_schema(items) for _ in range(arr_len)]
         if stype == "object":
             return self._deterministic_object(schema)
@@ -451,15 +475,6 @@ Result: ```json
         import random
         return ''.join(random.choices('abcdefghijklmnopqrstuvwxyz', k=8))
 
-    def _deterministic_object(self, schema):
-        result: Dict[str, Any] = {}
-        props: Dict[str, Any] = schema.get("properties", {}) or {}
-        required = schema.get("required", []) or []
-        keys = list(dict.fromkeys([*required, *props.keys()]))  # preserve order, remove dups
-        for key in keys:
-            child_schema = props.get(key, {"type": "string"})
-            result[key] = self._deterministic_value_for_schema(child_schema)
-        return result
 
     def _generate_for_object(self, schema: Dict[str, Any]) -> Dict[str, Any]:
         """Generate data for object schemas. Prefer parsed backend output; fallback to deterministic synthesis."""

@@ -17,3 +17,6 @@ coverage.xml
 *.pacakge
 *.pypi
 *.package
+
+# Ignore all files and folders from .testenv
+.testenv/
