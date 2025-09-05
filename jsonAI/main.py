@@ -697,10 +697,10 @@ Result: ```json
                             # Validate result
                             if validator:
                                 validator.validate(result, schema)
-                            self.debug(f"[generate_data] Used LLM/Jsonformer generation (attempt {attempt+1})", "")
+                            self.debug(f"[generate_data] Used LLM/Jsonformer generation (attempt {attempt + 1})", "")
                             return result
                         except Exception as e:
-                            self.debug(f"[generate_data] LLM/Jsonformer generation failed (attempt {attempt+1})", str(e))
+                            self.debug(f"[generate_data] LLM/Jsonformer generation failed (attempt {attempt + 1})", str(e))
                             last_exception = e
                             if attempt == self.llm_retries - 1:
                                 raise

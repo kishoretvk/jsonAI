@@ -242,7 +242,7 @@ As {agent.name}, the {agent.role}, provide a helpful response focusing on: {', '
                     "agent_id": agent.id,
                     "task": task
                 },
-                dependencies=[f"agent_{i-1}"] if i > 0 else []
+                dependencies=[f"agent_{i - 1}"] if i > 0 else []
             ))
 
         workflow_orchestrator.define_workflow(steps)

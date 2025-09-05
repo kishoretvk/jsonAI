@@ -26,7 +26,7 @@ class GitHubIntegration:
         self.headers = {"Authorization": f"token {self.token}"} if self.token else {}
 
     def create_issue_with_generated_data(self, repo: str, title: str,
-                                        jsonformer: Jsonformer, prompt: str) -> Dict[str, Any]:
+                                       jsonformer: Jsonformer, prompt: str) -> Dict[str, Any]:
         """Create a GitHub issue with generated JSON data."""
 
         # Generate data

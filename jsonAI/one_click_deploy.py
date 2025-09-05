@@ -270,7 +270,7 @@ class LocalDevDeployer:
 
         if requirements_path.exists():
             subprocess.run([str(pip_path), "install", "-r", "requirements.txt"],
-                          cwd=self.project_root)
+                           cwd=self.project_root)
 
         # Create .env file
         env_file = self.project_root / ".env"
