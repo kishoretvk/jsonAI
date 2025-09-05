@@ -85,7 +85,7 @@ class ConversationalAgentInterface:
         return agent
 
     async def process_conversation(self, conversation_id: str,
-                                  user_message: str) -> AsyncGenerator[str, None]:
+                                   user_message: str) -> AsyncGenerator[str, None]:
         """Process a conversation with streaming responses."""
 
         # Initialize conversation if new

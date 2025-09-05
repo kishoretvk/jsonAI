@@ -26,7 +26,7 @@ class GitHubIntegration:
         self.headers = {"Authorization": f"token {self.token}"} if self.token else {}
 
     def create_issue_with_generated_data(self, repo: str, title: str,
-                                       jsonformer: Jsonformer, prompt: str) -> Dict[str, Any]:
+                                        jsonformer: Jsonformer, prompt: str) -> Dict[str, Any]:
         """Create a GitHub issue with generated JSON data."""
 
         # Generate data
@@ -55,7 +55,7 @@ class GitHubIntegration:
         return response.json()
 
     def generate_from_issue(self, repo: str, issue_number: int,
-                           jsonformer: Jsonformer) -> Dict[str, Any]:
+                            jsonformer: Jsonformer) -> Dict[str, Any]:
         """Generate data based on GitHub issue content."""
 
         # Get issue
@@ -91,7 +91,7 @@ class SlackIntegration:
         }
 
     def post_generated_data(self, channel: str, jsonformer: Jsonformer,
-                           prompt: str, title: str = "Generated Data") -> Dict[str, Any]:
+                            prompt: str, title: str = "Generated Data") -> Dict[str, Any]:
         """Post generated JSON data to Slack channel."""
 
         # Generate data
@@ -129,7 +129,7 @@ class SlackIntegration:
         return response.json()
 
     async def handle_slack_command(self, command_text: str,
-                                  jsonformer: Jsonformer) -> str:
+                                   jsonformer: Jsonformer) -> str:
         """Handle Slack slash commands for JsonAI."""
 
         # Parse command
@@ -158,7 +158,7 @@ class VSCodeIntegration:
         self.extension_id = "jsonai.jsonai-vscode"
 
     def generate_schema_from_file(self, file_path: str,
-                                 jsonformer: Jsonformer) -> Dict[str, Any]:
+                                  jsonformer: Jsonformer) -> Dict[str, Any]:
         """Generate JSON schema from a file's content."""
 
         with open(file_path, 'r') as f:

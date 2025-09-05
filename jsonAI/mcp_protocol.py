@@ -137,8 +137,8 @@ class MCPProtocolHandler:
             result=result
         )
         
-    def create_error_response(self, request_id: Optional[str], error_type: MCPErrorType, 
-                             message: str, data: Optional[Any] = None) -> MCPMessage:
+    def create_error_response(self, request_id: Optional[str], error_type: MCPErrorType,
+                              message: str, data: Optional[Any] = None) -> MCPMessage:
         """Create an MCP error response message."""
         error_data = {
             "code": error_type.value,

@@ -114,7 +114,7 @@ class Tracer:
                 del self.active_spans[span_id]
                 
     def start_span_sync(self, name: str, attributes: Optional[Dict[str, Any]] = None,
-                       span_kind: SpanKind = SpanKind.INTERNAL) -> 'SpanHandle':
+                        span_kind: SpanKind = SpanKind.INTERNAL) -> 'SpanHandle':
         """Start a span synchronously and return a handle to manage it."""
         if attributes is None:
             attributes = {}
@@ -126,7 +126,7 @@ class Tracer:
         return SpanHandle(span, self)
         
     async def start_span_async(self, name: str, attributes: Optional[Dict[str, Any]] = None,
-                              span_kind: SpanKind = SpanKind.INTERNAL):
+                               span_kind: SpanKind = SpanKind.INTERNAL):
         """Start a span asynchronously and return a handle to manage it."""
         # For async, we'll use the same implementation as sync for now
         return self.start_span_sync(name, attributes, span_kind)

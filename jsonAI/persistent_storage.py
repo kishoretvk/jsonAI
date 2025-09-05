@@ -107,10 +107,10 @@ class SQLiteStorage:
         finally:
             conn.close()
             
-    def save_variable(self, name: str, value: Any, 
-                     scope: str = "global", 
-                     session_id: Optional[str] = None,
-                     metadata: Optional[Dict[str, Any]] = None) -> None:
+    def save_variable(self, name: str, value: Any,
+                      scope: str = "global",
+                      session_id: Optional[str] = None,
+                      metadata: Optional[Dict[str, Any]] = None) -> None:
         """Save a variable to persistent storage."""
         # Serialize the value and metadata
         serialized_value = self._serialize_value(value)
@@ -148,9 +148,9 @@ class SQLiteStorage:
         if self.debug:
             logger.debug(f"Saved variable {name} to persistent storage")
             
-    def load_variable(self, name: str, 
-                     scope: str = "global", 
-                     session_id: Optional[str] = None) -> Any:
+    def load_variable(self, name: str,
+                      scope: str = "global",
+                      session_id: Optional[str] = None) -> Any:
         """Load a variable from persistent storage."""
         with self._get_connection() as conn:
             cursor = conn.execute("""
@@ -171,9 +171,9 @@ class SQLiteStorage:
             
         return value
         
-    def has_variable(self, name: str, 
-                    scope: str = "global", 
-                    session_id: Optional[str] = None) -> bool:
+    def has_variable(self, name: str,
+                     scope: str = "global",
+                     session_id: Optional[str] = None) -> bool:
         """Check if a variable exists in persistent storage."""
         with self._get_connection() as conn:
             cursor = conn.execute("""
@@ -183,9 +183,9 @@ class SQLiteStorage:
             
             return cursor.fetchone() is not None
             
-    def delete_variable(self, name: str, 
-                       scope: str = "global", 
-                       session_id: Optional[str] = None) -> None:
+    def delete_variable(self, name: str,
+                        scope: str = "global",
+                        session_id: Optional[str] = None) -> None:
         """Delete a variable from persistent storage."""
         with self._get_connection() as conn:
             conn.execute("""
@@ -197,8 +197,8 @@ class SQLiteStorage:
         if self.debug:
             logger.debug(f"Deleted variable {name} from persistent storage")
             
-    def list_variables(self, scope: str = "global", 
-                      session_id: Optional[str] = None) -> List[str]:
+    def list_variables(self, scope: str = "global",
+                       session_id: Optional[str] = None) -> List[str]:
         """List all variable names in a scope."""
         with self._get_connection() as conn:
             cursor = conn.execute("""
@@ -209,9 +209,9 @@ class SQLiteStorage:
             return [row['name'] for row in cursor.fetchall()]
             
     def save_workflow_execution(self, execution_id: str, status: str,
-                               input_data: Optional[Dict[str, Any]] = None,
-                               output_data: Optional[Dict[str, Any]] = None,
-                               metadata: Optional[Dict[str, Any]] = None) -> None:
+                                input_data: Optional[Dict[str, Any]] = None,
+                                output_data: Optional[Dict[str, Any]] = None,
+                                metadata: Optional[Dict[str, Any]] = None) -> None:
         """Save workflow execution data."""
         serialized_input = json.dumps(input_data) if input_data else None
         serialized_output = json.dumps(output_data) if output_data else None
@@ -252,9 +252,9 @@ class SQLiteStorage:
             }
             
     def save_execution_step(self, execution_id: str, step_id: str, step_name: str,
-                           status: str, input_data: Optional[Dict[str, Any]] = None,
-                           output_data: Optional[Dict[str, Any]] = None,
-                           error: Optional[str] = None) -> None:
+                            status: str, input_data: Optional[Dict[str, Any]] = None,
+                            output_data: Optional[Dict[str, Any]] = None,
+                            error: Optional[str] = None) -> None:
         """Save execution step data."""
         serialized_input = json.dumps(input_data) if input_data else None
         serialized_output = json.dumps(output_data) if output_data else None

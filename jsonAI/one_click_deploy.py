@@ -24,7 +24,7 @@ class DockerDeployer:
         self.docker_dir = project_root / "docker"
 
     def create_dockerfile(self, base_image: str = "python:3.9-slim",
-                         expose_port: int = 8000) -> str:
+                          expose_port: int = 8000) -> str:
         """Create a Dockerfile for JsonAI."""
 
         dockerfile_content = f'''FROM {base_image}
@@ -270,7 +270,7 @@ class LocalDevDeployer:
 
         if requirements_path.exists():
             subprocess.run([str(pip_path), "install", "-r", "requirements.txt"],
-                         cwd=self.project_root)
+                          cwd=self.project_root)
 
         # Create .env file
         env_file = self.project_root / ".env"

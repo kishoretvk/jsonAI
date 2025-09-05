@@ -66,9 +66,9 @@ class StateManager:
         """Get the current session ID."""
         return self.current_session_id
         
-    def set_variable(self, name: str, value: Any, 
-                    scope: str = "global", 
-                    metadata: Optional[Dict[str, Any]] = None) -> None:
+    def set_variable(self, name: str, value: Any,
+                     scope: str = "global",
+                     metadata: Optional[Dict[str, Any]] = None) -> None:
         """Set a variable in the state."""
         if metadata is None:
             metadata = {}
@@ -142,7 +142,7 @@ class StateManager:
         elif scope == "session":
             if self.current_session_id is None:
                 return False
-            return (self.current_session_id in self.sessions and 
+            return (self.current_session_id in self.sessions and
                     name in self.sessions[self.current_session_id])
         else:
             raise ValueError(f"Unknown scope: {scope}")
@@ -153,12 +153,12 @@ class StateManager:
             if name in self.variables:
                 del self.variables[name]
         elif scope == "session":
-            if (self.current_session_id is not None and 
+            if (self.current_session_id is not None and
                 self.current_session_id in self.sessions and
                 name in self.sessions[self.current_session_id]):
                 del self.sessions[self.current_session_id][name]
-        else:
-            raise ValueError(f"Unknown scope: {scope}")
+            else:
+                raise ValueError(f"Unknown scope: {scope}")
             
         if self.debug:
             logger.debug(f"Deleted variable {name} from {scope} scope")

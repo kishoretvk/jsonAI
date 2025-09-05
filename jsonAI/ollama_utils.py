@@ -172,9 +172,9 @@ class OllamaPerformanceTuner:
         schema_str = json.dumps(schema).lower()
         
         # Check for JSON/structured data indicators
-        if any(keyword in desc_lower or keyword in schema_str 
+        if any(keyword in desc_lower or keyword in schema_str
                for keyword in ["json", "object", "array", "property", "schema"]):
-            if "enum" in schema_str or any(prop.get("type") in ["string", "integer", "number"] 
+            if "enum" in schema_str or any(prop.get("type") in ["string", "integer", "number"]
                                           for prop in schema.get("properties", {}).values()):
                 return "structured_data"
             return "json_generation"
@@ -197,8 +197,8 @@ class OllamaPerformanceTuner:
         # Default to general
         return "general"
         
-    def benchmark_models(self, prompt: str, schema: Dict[str, Any], 
-                        models: Optional[List[str]] = None) -> Dict[str, Dict[str, Any]]:
+    def benchmark_models(self, prompt: str, schema: Dict[str, Any],
+                         models: Optional[List[str]] = None) -> Dict[str, Dict[str, Any]]:
         """Benchmark multiple models for a given task."""
         if models is None:
             models = self.model_selector.get_available_models()[:5]  # Top 5 models
