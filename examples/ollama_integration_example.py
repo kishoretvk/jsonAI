@@ -104,7 +104,7 @@ def advanced_ollama_workflow_example():
                     "name": "Validate User Profile",
                     "type": "condition",
                     "config": {
-                        "expression": "result.get('name') and '@' in result.get('email', '')"
+                        "expression": "context.get('user_generation', {}).get('name') and '@' in context.get('user_generation', {}).get('email', '')"
                     },
                     "dependencies": ["user_generation"]
                 }

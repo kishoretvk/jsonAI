@@ -11,6 +11,14 @@ from jsonAI.schema_validator import SchemaValidator
 from jsonAI.tool_registry import ToolRegistry
 from jsonAI.async_tool_executor import AsyncToolExecutor, ToolExecutionError
 from jsonAI.workflow_orchestrator import WorkflowOrchestrator, WorkflowStep, WorkflowStepType
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from jsonAI.conversational_agent import ConversationalAgentInterface
+    from jsonAI.streaming_interface import StreamingJsonformer
+    from jsonAI.plugin_system import PluginRegistry
+    from jsonAI.integration_hub import IntegrationHub
+    from jsonAI.one_click_deploy import OneClickDeployer
 
 
 GENERATION_MARKER = "|GENERATION|"
@@ -48,6 +56,8 @@ class Jsonformer:
         workflow_config: Optional[Dict[str, Any]] = None,  # New parameter for workflow configuration
         # Ollama-specific parameters
         ollama_options: Optional[Dict[str, Any]] = None,  # Ollama-specific options
+        enable_next_gen: bool = False,  # Enable next-generation features
+        max_tokens: Optional[int] = None,  # Maximum tokens for generation (especially useful for small models)
     ):
         self.model_backend = model_backend
         self.json_schema = json_schema
@@ -61,6 +71,7 @@ class Jsonformer:
         self.fallback_order = fallback_order or ["llm", "deterministic", "random"]
         self.llm_retries = llm_retries
         self.fallback_hooks = fallback_hooks or {}
+        self.max_tokens = max_tokens  # Store max tokens for generation
         
         # Workflow configuration support
         self.workflow_config = workflow_config
@@ -71,6 +82,18 @@ class Jsonformer:
         # Ollama-specific configurations
         self.ollama_options = ollama_options or {}
 
+        # Initialize next-gen features
+        self.conversational_agent = None
+        self.streaming_interface = None
+        self.plugin_registry = None
+        self.integration_hub = None
+        self.deployer = None
+
+        # Enable advanced features if requested
+        self.enable_next_gen_features = enable_next_gen
+        if self.enable_next_gen_features:
+            self._initialize_next_gen_features()
+
         self.debug("[__init__] Initialized tool_registry", str(self.tool_registry))
         self.debug("[__init__] Initialized mcp_callback", str(self.mcp_callback))
 
@@ -80,6 +103,7 @@ class Jsonformer:
             max_number_tokens=max_number_tokens,
             max_string_token_length=max_string_token_length,
             temperature=temperature,
+            max_tokens=self.max_tokens,
         )
         self.output_formatter = OutputFormatter()
         self.schema_validator = SchemaValidator() if validate_output else None
@@ -119,6 +143,33 @@ class Jsonformer:
             steps.append(step)
             
         self.workflow_orchestrator.define_workflow(steps)
+        
+    def _initialize_next_gen_features(self):
+        """Initialize next-generation JsonAI features."""
+        try:
+            # Initialize conversational agent interface
+            self.conversational_agent = ConversationalAgentInterface(self.model_backend)
+            
+            # Initialize streaming interface
+            self.streaming_interface = StreamingJsonformer(self)
+            
+            # Initialize plugin system
+            self.plugin_registry = PluginRegistry()
+            self.plugin_registry.setup_default_paths()
+            self.plugin_registry.auto_discover()
+            
+            # Initialize integration hub
+            self.integration_hub = IntegrationHub()
+            
+            # Initialize deployment system
+            from pathlib import Path
+            self.deployer = OneClickDeployer(Path.cwd())
+            
+            self.debug("[_initialize_next_gen_features] Next-gen features initialized successfully")
+            
+        except Exception as e:
+            self.debug("[_initialize_next_gen_features] Failed to initialize next-gen features", str(e))
+            # Continue without next-gen features if initialization fails
         
     def debug(self, caller: str, value: str, is_prompt: bool = False) -> None:
         if self.debug_on:
@@ -519,6 +570,26 @@ Result: ```json
         import random
         return ''.join(random.choices('abcdefghijklmnopqrstuvwxyz', k=8))
 
+    def _deterministic_object(self, schema: Dict[str, Any]) -> Dict[str, Any]:
+        """Deterministically generate an object based on the schema properties."""
+        import random
+        obj = {}
+        properties = schema.get("properties", {})
+        
+        # Handle required fields
+        required = schema.get("required", [])
+        for field_name in required:
+            if field_name in properties:
+                obj[field_name] = self._deterministic_value_for_schema(properties[field_name])
+        
+        # Handle optional fields with a probability
+        for field_name, field_schema in properties.items():
+            if field_name not in obj:  # Not already added as required
+                # 70% chance to include optional fields
+                if random.random() < 0.7:
+                    obj[field_name] = self._deterministic_value_for_schema(field_schema)
+                    
+        return obj
 
     def _generate_for_object(self, schema: Dict[str, Any]) -> Dict[str, Any]:
         """Generate data for object schemas. Prefer parsed backend output; fallback to deterministic synthesis."""

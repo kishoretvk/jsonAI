@@ -11,6 +11,7 @@ import tempfile
 import os
 import pytest
 import importlib.util
+from opentelemetry.trace import StatusCode
 
 # Skip the whole module if ollama is not installed (optional dependency)
 if importlib.util.find_spec("ollama") is None:
@@ -92,7 +93,7 @@ class TestFinalAgenticIntegration(unittest.TestCase):
                         "name": "Validate Product",
                         "type": "condition",
                         "config": {
-                            "expression": "'product_name' in result and 'price' in result"
+                            "expression": "'product_name' in context.get('product_generation', {}) and 'price' in context.get('product_generation', {})"
                         },
                         "dependencies": ["product_generation"]
                     }
@@ -236,7 +237,7 @@ class TestFinalAgenticIntegration(unittest.TestCase):
                 os.rmdir(temp_dir)
                 
             tracer.add_event(test_span, "completed_test")
-            tracer.set_status(test_span, "OK")
+            tracer.set_status(test_span, StatusCode.OK)
             
             print("=== Agentic Testing Ecosystem Test Completed ===")
             

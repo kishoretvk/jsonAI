@@ -16,6 +16,7 @@ from jsonAI.state_manager import StateManager
 from jsonAI.persistent_storage import SQLiteStorage
 from jsonAI.mcp_protocol import MCPProtocolHandler
 from jsonAI.tracing import get_tracer
+from opentelemetry.trace import StatusCode
 
 
 class TestEnhancedJsonAIIntegration(unittest.TestCase):
@@ -142,7 +143,7 @@ class TestEnhancedJsonAIIntegration(unittest.TestCase):
                 os.rmdir(temp_dir)
                 
             tracer.add_event(test_span, "completed_test")
-            tracer.set_status(test_span, "OK")
+            tracer.set_status(test_span, StatusCode.OK)
             
     def test_state_management_with_storage(self):
         """Test state management with persistent storage."""
@@ -205,6 +206,8 @@ class TestEnhancedJsonAIIntegration(unittest.TestCase):
         
     def test_tracing_with_jsonformer(self):
         """Test tracing integration with Jsonformer."""
+        from opentelemetry.trace import StatusCode
+        
         # Create tracer
         tracer = get_tracer("jsonformer-test", debug=True)
         
@@ -226,7 +229,7 @@ class TestEnhancedJsonAIIntegration(unittest.TestCase):
             
             tracer.add_event(span, "generation_completed")
             tracer.set_attribute(span, "result_type", type(result).__name__)
-            tracer.set_status(span, "OK")
+            tracer.set_status(span, StatusCode.OK)
             
         # Verify we got a result
         self.assertIsNotNone(result)

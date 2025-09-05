@@ -6,10 +6,19 @@ This project uses separate environment files for dev, qa, perf, cte, and prod, e
 
 JsonAI is a comprehensive Python library for generating structured JSON data using Large Language Models (LLMs). It provides enterprise-grade features including robust JSON schema validation, multiple model backends, REST API, React frontend, CLI interface, and production deployment configurations.
 
-Current version: 0.15.1
+Current version: 0.15.2
 
-## 🔔 What's New in 0.15.1
+## 🔔 What's New in 0.15.2
 
+### 🚀 Agentic Capabilities (Next-Gen Features)
+- **Conversational Agents**: Natural language interface with multi-agent collaboration
+- **Real-time Streaming**: Live generation updates and agent responses
+- **Plugin System**: Extensible architecture for custom backends, formatters, and tools
+- **Integration Hub**: Connect with GitHub, Slack, VS Code, and webhooks
+- **One-Click Deployment**: Automated deployment to Docker, cloud providers
+- **Token Limits**: Optimized token management for small models (Mistral, etc.)
+
+### 🏗️ Enterprise Enhancements
 - Stabilized FastAPI REST API with endpoints for sync/async generation, batch processing, stats, cache management, and schema validation
 - Performance suite:
   - PerformanceMonitor async timing fixes
@@ -105,6 +114,97 @@ JsonAI supports complex agentic workflows with Ollama:
 - MCP protocol support for tool integration
 
 See `examples/ollama_integration_example.py` for detailed usage examples.
+
+## 🤖 Conversational Agents & Next-Gen Features
+
+JsonAI now includes advanced agentic capabilities for natural language interaction and extensible workflows:
+
+### Conversational Agents
+```python
+from jsonAI.conversational_agent import ConversationalAgentInterface
+from jsonAI.model_backends import OllamaBackend
+
+# Create agent interface
+backend = OllamaBackend(model_name="mistral:latest")
+agent_interface = ConversationalAgentInterface(backend)
+
+# Create specialized agents
+schema = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "role": {"type": "string"},
+        "skills": {"type": "array", "items": {"type": "string"}}
+    }
+}
+
+agent = agent_interface.create_agent(
+    agent_id="developer_agent",
+    name="DevAgent",
+    role="Software Developer",
+    capabilities=["code_generation", "debugging"],
+    schema=schema,
+    max_tokens=150  # Optimized for Mistral
+)
+
+# Process natural language requests
+async for response in agent_interface.process_conversation(
+    "test_conv", "Generate a Python developer profile"
+):
+    print(response)
+```
+
+### Real-Time Streaming
+```python
+from jsonAI.streaming_interface import StreamingJsonformer
+
+# Enable streaming for live updates
+jsonformer = StreamingJsonformer(
+    model_backend=backend,
+    json_schema=schema,
+    prompt="Generate user data",
+    enable_streaming=True
+)
+
+# Stream generation results
+async for chunk in jsonformer.stream_generate():
+    print(f"Received: {chunk}")
+```
+
+### Plugin System
+```python
+from jsonAI.plugin_system import PluginRegistry
+
+# Load custom plugins
+registry = PluginRegistry()
+registry.setup_default_paths()
+registry.auto_discover()
+
+# Use custom backends or tools
+custom_backend = registry.get_backend("custom_llm")
+```
+
+### Integration Hub
+```python
+from jsonAI.integration_hub import IntegrationHub
+
+# Connect to external services
+hub = IntegrationHub()
+await hub.github_integration(token="your_token")
+await hub.slack_integration(webhook_url="your_webhook")
+```
+
+### One-Click Deployment
+```python
+from jsonAI.one_click_deploy import OneClickDeployer
+
+# Deploy to multiple platforms
+deployer = OneClickDeployer()
+await deployer.deploy_docker()
+await deployer.deploy_cloud(provider="aws")
+```
+
+See `examples/next_gen_demo.py` and `examples/mistral_token_limits_example.py` for complete examples.
 
 ## 📦 Installation
 

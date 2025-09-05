@@ -53,6 +53,7 @@ class TypeGenerator:
         max_number_tokens: int = 6,
         max_string_token_length: int = 175,
         temperature: float = 1.0,
+        max_tokens: Optional[int] = None,
     ):
         """
         Initialize the type generator with configuration and model backend.
@@ -63,6 +64,7 @@ class TypeGenerator:
             max_number_tokens (int): Maximum tokens to generate for numbers.
             max_string_token_length (int): Maximum tokens to generate for strings.
             temperature (float): Sampling temperature for generation.
+            max_tokens (Optional[int]): Maximum tokens for overall generation (useful for small models).
 
         Raises:
             ValueError: If the model backend is incompatible.
@@ -72,6 +74,7 @@ class TypeGenerator:
         self.max_number_tokens = max_number_tokens
         self.max_string_token_length = max_string_token_length
         self.temperature = temperature
+        self.max_tokens = max_tokens  # Store max tokens for generation
         # Optional helpers depending on backend capabilities
         self.type_prefix_tokens: Optional[dict[str, list[str]]] = None
         self.number_logit_processor: Optional[Any] = None
@@ -165,7 +168,7 @@ class TypeGenerator:
                 stopping_criteria = None
             response = self._generate_with_processor(
                 prompt=strict_prompt,
-                max_tokens=self.max_number_tokens,
+                max_tokens=self.max_tokens or self.max_number_tokens,
                 logits_processor=logits_processor,
                 stopping_criteria=stopping_criteria,
                 temperature=temperature,
@@ -226,7 +229,7 @@ class TypeGenerator:
                 stopping_criteria = None
             response = self._generate_with_processor(
                 prompt=strict_prompt,
-                max_tokens=self.max_number_tokens,
+                max_tokens=self.max_tokens or self.max_number_tokens,
                 logits_processor=logits_processor,
                 stopping_criteria=stopping_criteria,
                 temperature=temperature,
@@ -347,7 +350,7 @@ class TypeGenerator:
             prompt_len = int(input_tokens.numel()) if hasattr(input_tokens, "numel") else len(input_tokens)
             response = self._generate_with_processor(
                 prompt=prompt,
-                max_tokens=self.max_string_token_length,
+                max_tokens=self.max_tokens or self.max_string_token_length,
                 stopping_criteria=[
                     StringStoppingCriteria(
                         self.model_backend.tokenizer, prompt_len, maxLength
@@ -359,7 +362,7 @@ class TypeGenerator:
         else:
             response = self.model_backend.generate(
                 prompt,
-                max_new_tokens=self.max_string_token_length,
+                max_new_tokens=self.max_tokens or self.max_string_token_length,
                 temperature=self.temperature,
             )
             response = string_post_process(response[len(prompt):])

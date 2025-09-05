@@ -29,6 +29,7 @@ from jsonAI.persistent_storage import SQLiteStorage
 from jsonAI.mcp_protocol import MCPProtocolHandler
 from jsonAI.tracing import get_tracer
 from jsonAI.ollama_utils import OllamaModelSelector, OllamaPerformanceTuner
+from opentelemetry.trace import StatusCode  # Add this import
 
 # Skip tests in CI environments
 skip_ollama = pytest.mark.skipif(
@@ -120,7 +121,7 @@ class TestAgenticOllamaIntegration(unittest.TestCase):
                         "name": "Validate Profile",
                         "type": "condition",
                         "config": {
-                            "expression": "'name' in result and 'age' in result and 'occupation' in result"
+                            "expression": "'name' in context.get('profile_generation', {}) and 'age' in context.get('profile_generation', {}) and 'occupation' in context.get('profile_generation', {})"
                         },
                         "dependencies": ["profile_generation"]
                     }
@@ -245,7 +246,7 @@ class TestAgenticOllamaIntegration(unittest.TestCase):
                 os.rmdir(temp_dir)
                 
             tracer.add_event(test_span, "completed_test")
-            tracer.set_status(test_span, "OK")
+            tracer.set_status(test_span, StatusCode.OK)
             
     def test_ollama_with_tracing_and_error_handling(self):
         """Test Ollama integration with tracing and error handling."""
@@ -277,7 +278,7 @@ class TestAgenticOllamaIntegration(unittest.TestCase):
                 
                 tracer.add_event(span, "generation_completed")
                 tracer.set_attribute(span, "result_type", type(result).__name__)
-                tracer.set_status(span, "OK")
+                tracer.set_status(span, StatusCode.OK)
                 
                 # Verify we got a result
                 self.assertIsNotNone(result)
@@ -285,7 +286,7 @@ class TestAgenticOllamaIntegration(unittest.TestCase):
                 
             except Exception as e:
                 tracer.add_event(span, f"generation_failed: {str(e)}")
-                tracer.set_status(span, "ERROR")
+                tracer.set_status(span, StatusCode.ERROR)
                 # Don't fail the test here, as we want to see how error handling works
                 print(f"Generation failed (as expected in some cases): {e}")
                 
