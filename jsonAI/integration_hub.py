@@ -172,7 +172,7 @@ class VSCodeIntegration:
             try:
                 data = json.loads(content)
                 schema = self._infer_schema_from_data(data)
-            except:
+            except (json.JSONDecodeError, ValueError):
                 schema = {"type": "object", "properties": {}}
         else:
             # Generate generic schema

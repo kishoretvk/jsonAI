@@ -226,7 +226,7 @@ class RealTimeDashboard:
         for subscriber in self.subscribers:
             try:
                 await subscriber.put(message)
-            except:
+            except Exception:
                 # Remove dead subscribers
                 self.subscribers.remove(subscriber)
 

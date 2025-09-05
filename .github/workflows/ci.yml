@@ -24,7 +24,18 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Set environment file for ${{ matrix.app-env }}
-      run: cp .env.${{ matrix.app-env }} .env
+      run: |
+        if [ -f .env.${{ matrix.app-env }} ]; then
+          cp .env.${{ matrix.app-env }} .env
+        else
+          echo "Creating basic .env file for CI"
+          cat > .env << EOF
+        API_HOST=0.0.0.0
+        API_PORT=8000
+        DEFAULT_MODEL=ollama
+        LOG_LEVEL=INFO
+        EOF
+        fi
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5

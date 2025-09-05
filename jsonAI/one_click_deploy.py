@@ -215,7 +215,7 @@ class CloudDeployer:
     def create_fly_config(self) -> str:
         """Create Fly.io deployment configuration."""
 
-        config = f'''app = "jsonai"
+        config = '''app = "jsonai"
 primary_region = "iad"
 
 [build]

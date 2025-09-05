@@ -61,8 +61,8 @@ class ConversationalAgentInterface:
         self.workflow_orchestrator = WorkflowOrchestrator(debug=False)
 
     def create_agent(self, agent_id: str, name: str, role: str,
-                    capabilities: List[str], schema: Dict[str, Any],
-                    max_tokens: Optional[int] = None) -> Agent:
+                     capabilities: List[str], schema: Dict[str, Any],
+                     max_tokens: Optional[int] = None) -> Agent:
         """Create a new agent with specific capabilities."""
 
         jsonformer = Jsonformer(
@@ -85,7 +85,7 @@ class ConversationalAgentInterface:
         return agent
 
     async def process_conversation(self, conversation_id: str,
-                                 user_message: str) -> AsyncGenerator[str, None]:
+                                  user_message: str) -> AsyncGenerator[str, None]:
         """Process a conversation with streaming responses."""
 
         # Initialize conversation if new
