@@ -172,7 +172,7 @@ class OllamaPerformanceTuner:
         schema_str = json.dumps(schema).lower()
         
         # Check for JSON/structured data indicators
-        if any(keyword in desc_lower or keyword in schema_str
+        if any(keyword in desc_lower
                for keyword in ["json", "object", "array", "property", "schema"]):
             if "enum" in schema_str or any(prop.get("type") in ["string", "integer", "number"]
                                           for prop in schema.get("properties", {}).values()):
