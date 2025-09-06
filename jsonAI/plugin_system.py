@@ -210,3 +210,15 @@ def register_plugin(plugin: PluginBase) -> None:
     """Register a plugin globally."""
     registry = get_plugin_registry()
     registry.manager.register_plugin(plugin)
+
+
+def get_plugin(name: str) -> Optional[PluginBase]:
+    """Get a plugin by name from the global registry."""
+    registry = get_plugin_registry()
+    return registry.manager.get_plugin(name)
+
+
+def get_plugins_by_type(plugin_type: str) -> List[PluginBase]:
+    """Get all plugins of a specific type from the global registry."""
+    registry = get_plugin_registry()
+    return registry.manager.get_plugins_by_type(plugin_type)
