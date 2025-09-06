@@ -142,8 +142,8 @@ class StateManager:
         elif scope == "session":
             if self.current_session_id is None:
                 return False
-            return (self.current_session_id in self.sessions
-                    and name in self.sessions[self.current_session_id])
+            return (self.current_session_id in self.sessions and
+                    name in self.sessions[self.current_session_id])
         else:
             raise ValueError(f"Unknown scope: {scope}")
             
@@ -153,12 +153,12 @@ class StateManager:
             if name in self.variables:
                 del self.variables[name]
         elif scope == "session":
-            if (self.current_session_id is not None
-                and self.current_session_id in self.sessions
-                and name in self.sessions[self.current_session_id]):
+            if (self.current_session_id is not None and
+                self.current_session_id in self.sessions and
+                name in self.sessions[self.current_session_id]):
                 del self.sessions[self.current_session_id][name]
-            else:
-                raise ValueError(f"Unknown scope: {scope}")
+        else:
+            raise ValueError(f"Unknown scope: {scope}")
             
         if self.debug:
             logger.debug(f"Deleted variable {name} from {scope} scope")
