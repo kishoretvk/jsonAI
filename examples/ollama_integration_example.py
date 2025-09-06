@@ -21,21 +21,42 @@ def basic_ollama_example():
     """Basic example of using JsonAI with Ollama."""
     print("=== Basic Ollama Example ===")
     
-    # Create Ollama backend (make sure Ollama is running with mistral model)
-    backend = OllamaBackend(model_name="mistral")
+    # Create Ollama backend (make sure Ollama is running with mistral:latest model)
+    backend = OllamaBackend(model_name="mistral:latest")
     
-    # Define a simple schema
+    # Define a better schema with examples and constraints
     schema = {
         "type": "object",
         "properties": {
-            "product_name": {"type": "string"},
-            "price": {"type": "number"},
-            "in_stock": {"type": "boolean"}
-        }
+            "product_name": {
+                "type": "string",
+                "description": "The name of the product",
+                "examples": ["Wireless Bluetooth Headphones", "Smart Fitness Tracker", "Organic Coffee Beans"]
+            },
+            "price": {
+                "type": "number",
+                "description": "Price in USD",
+                "minimum": 1.99,
+                "maximum": 999.99,
+                "examples": [29.99, 149.99, 24.99]
+            },
+            "in_stock": {
+                "type": "boolean",
+                "description": "Whether the product is currently available"
+            },
+            "category": {
+                "type": "string",
+                "enum": ["electronics", "clothing", "books", "home", "sports"],
+                "description": "Product category"
+            }
+        },
+        "required": ["product_name", "price", "in_stock"]
     }
     
-    # Create prompt
-    prompt = "Generate information about a fictional product"
+    # Create a more detailed prompt
+    prompt = """Generate information for a realistic e-commerce product. 
+    Create a product that would be found in an online store with a reasonable price and category.
+    Make sure the product name is descriptive and the price is appropriate for the category."""
     
     # Create Jsonformer
     jsonformer = Jsonformer(
@@ -68,7 +89,7 @@ def advanced_ollama_workflow_example():
     
     with tracer.start_span("advanced_ollama_workflow") as workflow_span:
         # Create Ollama backend
-        backend = OllamaBackend(model_name="mistral", max_retries=2)
+        backend = OllamaBackend(model_name="mistral:latest", max_retries=2)
         
         # Define schema
         user_schema = {

@@ -288,5 +288,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())</content>
-<parameter name="filePath">d:\git\GenerativeJson\examples\next_gen_demo.py
+    asyncio.run(main())

@@ -44,7 +44,7 @@ class OllamaModelSelector:
             import ollama
             client = ollama.Client(host=self.host)
             response = client.list()
-            models = [model['name'].split(':')[0] for model in response.get('models', [])]
+            models = [model.model.split(':')[0] for model in response.models]
             self._available_models = models
             return models
         except Exception as e:
