@@ -365,7 +365,14 @@ class TypeGenerator:
                 max_new_tokens=self.max_tokens or self.max_string_token_length,
                 temperature=self.temperature,
             )
-            response = string_post_process(response[len(prompt):])
+            # For backends like Ollama that only return generated text (not including prompt),
+            # don't slice off the prompt since it's not there
+            if hasattr(self.model_backend, 'client') and 'ollama' in str(type(self.model_backend.client)).lower():
+                self.debug("[generate_string] Using Ollama path - no slicing", "")
+                response = string_post_process(response)
+            else:
+                self.debug("[generate_string] Using standard path - slicing", "")
+                response = string_post_process(response[len(prompt):])
 
         self.debug("[generate_string]", "|" + response + "|")
         return response

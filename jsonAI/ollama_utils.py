@@ -40,17 +40,26 @@ class OllamaModelSelector:
         if self._available_models is not None:
             return self._available_models
             
-        try:
-            import ollama
-            client = ollama.Client(host=self.host)
-            response = client.list()
-            models = [model.model.split(':')[0] for model in response.models]
-            self._available_models = models
-            return models
-        except Exception as e:
-            print(f"Warning: Could not fetch available models from Ollama: {e}")
-            # Return default ranking as fallback
-            return self.DEFAULT_MODEL_RANKING.copy()
+        import time
+        max_retries = 3
+        
+        for attempt in range(max_retries):
+            try:
+                import ollama
+                client = ollama.Client(host=self.host)
+                response = client.list()
+                models = [model.model.split(':')[0] for model in response.models]
+                self._available_models = models
+                return models
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    wait_time = 2 ** attempt  # Exponential backoff
+                    print(f"Attempt {attempt + 1} failed, retrying in {wait_time}s: {e}")
+                    time.sleep(wait_time)
+                else:
+                    print(f"Warning: Could not fetch available models from Ollama: {e}")
+                    # Return default ranking as fallback
+                    return self.DEFAULT_MODEL_RANKING.copy()
             
     def select_best_model(self, task_type: str = "general") -> str:
         """Select the best model for a given task type."""
@@ -70,9 +79,14 @@ class OllamaModelSelector:
         
         # Find the first available model from preferences
         for model in preferences:
+            # Check exact match first
             if model in available:
                 return model
-                
+            # Check with version tags (e.g., "mistral:latest")
+            for avail_model in available:
+                if avail_model.startswith(model + ":"):
+                    return avail_model
+                    
         # Fallback to first available model
         return available[0] if available else "mistral"
         
@@ -85,25 +99,21 @@ class OllamaModelSelector:
             "repeat_penalty": 1.1
         }
         
-        # Model-specific adjustments
+        # Model-specific adjustments (only non-temperature parameters)
         model_params = {
             "mistral": {
-                "temperature": 0.7,
                 "top_p": 0.9,
                 "repeat_penalty": 1.1
             },
             "llama3": {
-                "temperature": 0.7,
                 "top_p": 0.95,
                 "repeat_penalty": 1.1
             },
             "phi3": {
-                "temperature": 0.6,
                 "top_p": 0.9,
                 "repeat_penalty": 1.2
             },
             "gemma": {
-                "temperature": 0.6,
                 "top_p": 0.9,
                 "repeat_penalty": 1.1
             }
@@ -133,15 +143,33 @@ class OllamaModelSelector:
             }
         }
         
-        # Apply model-specific parameters
-        if model_name in model_params:
-            params.update(model_params[model_name])
-            
-        # Apply task-specific parameters
+        # Apply task-specific parameters FIRST (higher priority)
         if task_type in task_params:
             params.update(task_params[task_type])
             
-        return params
+        # Apply model-specific parameters (lower priority, only for model-specific tuning)
+        # Handle version tags (e.g., "mistral:latest" -> "mistral")
+        base_model_name = model_name.split(':')[0] if ':' in model_name else model_name
+        if base_model_name in model_params:
+            params.update(model_params[base_model_name])
+            
+        # Validate parameters
+        return self._validate_parameters(params)
+        
+    def _validate_parameters(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate and clamp parameters to valid ranges."""
+        validated = params.copy()
+        
+        # Temperature: 0.0 to 2.0
+        validated["temperature"] = max(0.0, min(2.0, params.get("temperature", 0.7)))
+        
+        # Top-p: 0.0 to 1.0
+        validated["top_p"] = max(0.0, min(1.0, params.get("top_p", 0.9)))
+        
+        # Repeat penalty: 1.0 to 2.0
+        validated["repeat_penalty"] = max(1.0, min(2.0, params.get("repeat_penalty", 1.1)))
+        
+        return validated
 
 
 class OllamaPerformanceTuner:

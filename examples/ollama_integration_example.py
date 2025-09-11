@@ -21,8 +21,8 @@ def basic_ollama_example():
     """Basic example of using JsonAI with Ollama."""
     print("=== Basic Ollama Example ===")
     
-    # Create Ollama backend (make sure Ollama is running with mistral:latest model)
-    backend = OllamaBackend(model_name="mistral:latest")
+    # Create Ollama backend with different model and lower temperature
+    backend = OllamaBackend(model_name="qwen3:0.6b")
     
     # Define a better schema with examples and constraints
     schema = {
@@ -53,10 +53,16 @@ def basic_ollama_example():
         "required": ["product_name", "price", "in_stock"]
     }
     
-    # Create a more detailed prompt
-    prompt = """Generate information for a realistic e-commerce product. 
-    Create a product that would be found in an online store with a reasonable price and category.
-    Make sure the product name is descriptive and the price is appropriate for the category."""
+    # Create a more detailed prompt with examples
+    prompt = """Generate information for a realistic e-commerce product.
+
+    Examples of good products:
+    - Product: "Wireless Bluetooth Headphones", Price: $89.99, Category: "electronics", In Stock: true
+    - Product: "Organic Cotton T-Shirt", Price: $24.99, Category: "clothing", In Stock: false
+    - Product: "Stainless Steel Water Bottle", Price: $19.99, Category: "sports", In Stock: true
+
+    Create a product that would be found in an online store with a reasonable price for its category.
+    Make sure the product name is descriptive and professional."""
     
     # Create Jsonformer
     jsonformer = Jsonformer(
@@ -64,7 +70,7 @@ def basic_ollama_example():
         json_schema=schema,
         prompt=prompt,
         ollama_options={
-            "temperature": 0.7,
+            "temperature": 0.3,  # Lower temperature for more focused output
             "repeat_penalty": 1.2
         },
         debug=True
@@ -89,22 +95,45 @@ def advanced_ollama_workflow_example():
     
     with tracer.start_span("advanced_ollama_workflow") as workflow_span:
         # Create Ollama backend
-        backend = OllamaBackend(model_name="mistral:latest", max_retries=2)
+        backend = OllamaBackend(model_name="qwen3:0.6b", max_retries=2)
         
-        # Define schema
+        # Define improved schema with examples and constraints
         user_schema = {
             "type": "object",
             "properties": {
-                "name": {"type": "string"},
-                "email": {"type": "string", "format": "email"},
+                "name": {
+                    "type": "string",
+                    "description": "Full name of the user",
+                    "examples": ["John Smith", "Sarah Johnson", "Michael Chen"]
+                },
+                "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "Valid email address",
+                    "examples": ["john.smith@email.com", "sarah.j@email.com"]
+                },
+                "age": {
+                    "type": "integer",
+                    "description": "Age in years",
+                    "minimum": 18,
+                    "maximum": 80,
+                    "examples": [25, 35, 42]
+                },
                 "preferences": {
                     "type": "object",
                     "properties": {
-                        "newsletter": {"type": "boolean"},
-                        "sms_alerts": {"type": "boolean"}
+                        "newsletter": {
+                            "type": "boolean",
+                            "description": "Whether user wants to receive newsletters"
+                        },
+                        "sms_alerts": {
+                            "type": "boolean",
+                            "description": "Whether user wants SMS notifications"
+                        }
                     }
                 }
-            }
+            },
+            "required": ["name", "email", "age"]
         }
         
         # Define workflow configuration
@@ -115,7 +144,15 @@ def advanced_ollama_workflow_example():
                     "name": "Generate User Profile",
                     "type": "generation",
                     "config": {
-                        "prompt": "Generate a realistic user profile for a tech product",
+                        "prompt": """Generate a realistic user profile for a tech product website.
+
+                        Examples of realistic user profiles:
+                        - Name: "Alex Rodriguez", Email: "alex.r@email.com", Age: 28, Newsletter: true, SMS: false
+                        - Name: "Maria Chen", Email: "maria.chen@techcorp.com", Age: 34, Newsletter: true, SMS: true
+                        - Name: "David Kim", Email: "dkim85@gmail.com", Age: 42, Newsletter: false, SMS: true
+
+                        Create a profile for someone who would realistically use tech products.
+                        Use a realistic name, professional email, appropriate age for a tech user, and realistic subscription preferences.""",
                         "schema": user_schema
                     },
                     "dependencies": []
@@ -188,31 +225,66 @@ def ollama_model_selection_example():
     task_schema = {
         "type": "object",
         "properties": {
-            "title": {"type": "string"},
-            "content": {"type": "string"},
+            "title": {
+                "type": "string",
+                "description": "An engaging title for the blog post",
+                "examples": ["Getting Started with Python Async Programming", "Building REST APIs with FastAPI"]
+            },
+            "content": {
+                "type": "string",
+                "description": "The main content of the blog post",
+                "examples": ["In this post, we'll explore how to use async/await in Python..."]
+            },
             "tags": {
                 "type": "array",
-                "items": {"type": "string"}
+                "items": {"type": "string"},
+                "description": "Relevant tags for the blog post",
+                "minItems": 2,
+                "maxItems": 5,
+                "examples": [["python", "async"], ["web-development", "api", "fastapi"]]
+            },
+            "category": {
+                "type": "string",
+                "enum": ["tutorial", "news", "opinion", "review"],
+                "description": "The category of the blog post"
             }
-        }
+        },
+        "required": ["title", "content", "tags"]
     }
     
     model_name, tuned_params = tuner.tune_for_task(
         "Generate blog post metadata",
-        "Generate metadata for a technical blog post",
+        """Generate comprehensive metadata for a technical blog post about programming or software development.
+
+        Examples of good blog posts:
+        - Title: "Mastering Async/Await in Python: A Complete Guide"
+          Content: "Learn how to write efficient asynchronous code in Python using async/await patterns, with practical examples and best practices."
+          Tags: ["python", "async", "concurrency", "programming"]
+          Category: "tutorial"
+
+        - Title: "FastAPI vs Django: Choosing the Right Framework"
+          Content: "Compare FastAPI and Django for modern web development, analyzing performance, ease of use, and use cases."
+          Tags: ["python", "web-development", "fastapi", "django", "frameworks"]
+          Category: "review"
+
+        Generate an engaging title, brief but informative content summary, relevant technical tags, and appropriate category.""",
         task_schema
     )
     
     print(f"Tuned model: {model_name}")
     print(f"Tuned parameters: {tuned_params}")
     
-    # Use the tuned configuration
-    backend = OllamaBackend(model_name=model_name)
+    # Use the tuned configuration with lower temperature
+    backend = OllamaBackend(model_name="qwen3:0.6b")
     jsonformer = Jsonformer(
         model_backend=backend,
         json_schema=task_schema,
         prompt="Generate metadata for a technical blog post",
-        ollama_options=tuned_params,
+        ollama_options={
+            "temperature": 0.2,  # Very low temperature for focused, relevant output
+            "top_p": 0.9,
+            "repeat_penalty": 1.1
+        },
         debug=True
     )
     

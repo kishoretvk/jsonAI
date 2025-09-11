@@ -237,17 +237,17 @@ class Jsonformer:
         self.debug("[generate_value] Schema type", schema_type)
         if isinstance(schema_type, list):
             if key is not None and isinstance(obj, dict):
-                obj[key] = self.generation_marker
+                obj[key] = GENERATION_MARKER
             elif isinstance(obj, list):
-                obj.append(self.generation_marker)
+                obj.append(GENERATION_MARKER)
             schema_type = self.choose_type_to_generate(schema_type)
 
         # Ensure generation marker is added for primitive types
         if schema_type in ["string", "number", "integer", "boolean", "datetime", "date", "time", "uuid", "binary", "p_enum", "p_integer", "enum", "null"]:
             if key is not None and isinstance(obj, dict):
-                obj[key] = self.generation_marker
+                obj[key] = GENERATION_MARKER
             elif isinstance(obj, list):
-                obj.append(self.generation_marker)
+                obj.append(GENERATION_MARKER)
             self.debug("[generate_value] Added generation marker", str(obj))
 
         prompt = self.get_prompt()
@@ -282,9 +282,14 @@ class Jsonformer:
 
     def get_prompt(self) -> str:
         template = """{prompt}
-Output result in the following JSON schema format:
-``json{schema}```
-Result: ```json
+
+Please respond with a valid JSON object that matches the following schema:
+{schema}
+
+Your response should contain actual data, not the schema itself.
+Generate realistic, contextual content that fits the schema requirements.
+
+Result JSON:
 {progress}"""
         value = self.value
 
@@ -292,7 +297,7 @@ Result: ```json
         progress = json.dumps(value)
         self.debug("[get_prompt] Progress string", progress)
 
-        gen_marker_index = progress.find(f'"{self.generation_marker}"')
+        gen_marker_index = progress.find(f'"{GENERATION_MARKER}"')
         if gen_marker_index != -1:
             progress = progress[:gen_marker_index]
         else:
@@ -301,7 +306,7 @@ Result: ```json
 
         prompt = template.format(
             prompt=self.prompt,
-            schema=json.dumps(self.json_schema),
+            schema=json.dumps(self.json_schema, indent=2),
             progress=progress,
         )
 
@@ -390,10 +395,27 @@ Result: ```json
     def _try_extract_json_from_backend_output(self, backend_output: str) -> Optional[Dict[str, Any]]:
         """Attempt to parse a dict JSON object from a raw backend output string."""
         import re, json as _json
+        
+        # Clean the output - remove common prefixes and suffixes
+        cleaned_output = backend_output.strip()
+        
+        # Remove common LLM response patterns
+        patterns_to_remove = [
+            r'^Here\'s.*?:\s*',
+            r'^Here is.*?:\s*',
+            r'^The.*?is:\s*',
+            r'^.*?metadata.*?:\s*',
+            r'^.*?JSON.*?:\s*',
+        ]
+        for pattern in patterns_to_remove:
+            cleaned_output = re.sub(pattern, '', cleaned_output, flags=re.IGNORECASE)
+        
         # Extract <answer> blocks if present
-        answer_blocks = re.findall(r'<answer>([\s\S]*?)</answer>', backend_output, re.IGNORECASE)
-        sources = answer_blocks if answer_blocks else [backend_output]
+        answer_blocks = re.findall(r'<answer>([\s\S]*?)</answer>', cleaned_output, re.IGNORECASE)
+        sources = answer_blocks if answer_blocks else [cleaned_output]
+        
         for source in sources:
+            # Try to find JSON objects with better regex
             json_candidates = re.findall(r'\{[\s\S]*?\}', source)
             for candidate in json_candidates:
                 try:
@@ -402,24 +424,45 @@ Result: ```json
                         return parsed
                 except Exception:
                     pass
-            # Try whole source
+            
+            # Try the whole source after cleaning
             try:
                 parsed = _json.loads(source.strip())
                 if isinstance(parsed, dict):
                     return parsed
             except Exception:
                 pass
+                
+            # Try to extract just the JSON part if it's embedded in text
+            # Look for JSON that starts with { and ends with }
+            json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', source)
+            if json_match:
+                try:
+                    parsed = _json.loads(json_match.group())
+                    if isinstance(parsed, dict):
+                        return parsed
+                except Exception:
+                    pass
+        
         return None
 
     def _safe_backend_generate(self) -> Optional[str]:
         """Try to call backend.generate(prompt) safely and return raw string, else None."""
         if hasattr(self.model_backend, 'generate'):
             try:
+                # Try to use the properly constructed prompt that includes schema and progress
+                try:
+                    constructed_prompt = self.get_prompt()
+                except (ValueError, AttributeError) as prompt_error:
+                    # If get_prompt fails (e.g., no generation marker), use the original prompt
+                    self.debug("[_safe_backend_generate] get_prompt failed, using original prompt", str(prompt_error))
+                    constructed_prompt = self.prompt
+                
                 # Pass Ollama-specific options if using Ollama backend
                 if hasattr(self.model_backend, 'structured') and self.model_backend.structured:
-                    return self.model_backend.generate(self.prompt, **self.ollama_options)
+                    return self.model_backend.generate(constructed_prompt, **self.ollama_options)
                 else:
-                    return self.model_backend.generate(self.prompt)
+                    return self.model_backend.generate(constructed_prompt)
             except Exception as e:
                 self.debug("[_safe_backend_generate] Backend generate failed", str(e))
         return None
@@ -594,6 +637,16 @@ Result: ```json
     def _generate_for_object(self, schema: Dict[str, Any]) -> Dict[str, Any]:
         """Generate data for object schemas. Prefer parsed backend output; fallback to deterministic synthesis."""
         self.value = {}
+        
+        # For object generation, we need to initialize with generation markers for each property
+        properties = schema.get("properties", {})
+        if properties:
+            # Initialize self.value with generation markers for each required property
+            required = schema.get("required", [])
+            for prop_name in required:
+                if prop_name in properties:
+                    self.value[prop_name] = GENERATION_MARKER
+        
         # Try to pull raw backend output if available and parse JSON out of it
         backend_output = None
         if hasattr(self.model_backend, 'last_output') and isinstance(self.model_backend.last_output, str):
