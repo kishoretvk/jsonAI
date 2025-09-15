@@ -1,0 +1,54 @@
+{
+  "name": "example_workflow",
+  "version": "1.0",
+  "description": "Example workflow for testing JsonAI enhancements",
+  "variables": {
+    "api_base_url": "https://jsonplaceholder.typicode.com",
+    "environment": "test"
+  },
+  "steps": [
+    {
+      "id": "generate_user_data",
+      "name": "Generate Test User Data",
+      "type": "json_generation",
+      "config": {
+        "schema": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string"},
+            "username": {"type": "string"},
+            "email": {"type": "string", "format": "email"},
+            "phone": {"type": "string"},
+            "website": {"type": "string"}
+          },
+          "required": ["name", "username", "email"]
+        },
+        "prompt": "Generate a realistic user profile for API testing",
+        "output_variable": "test_user_data"
+      }
+    },
+    {
+      "id": "validate_user_data",
+      "name": "Validate Generated User Data",
+      "type": "data_validation",
+      "depends_on": ["generate_user_data"],
+      "config": {
+        "data_variable": "test_user_data",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string"},
+            "email": {"type": "string", "format": "email"}
+          },
+          "required": ["name", "email"]
+        },
+        "fail_on_invalid": false
+      }
+    }
+  ],
+  "error_handling": {
+    "retry_count": 2,
+    "timeout": 60,
+    "on_failure": "continue"
+  }
+}
